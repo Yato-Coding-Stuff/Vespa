@@ -1,3 +1,9 @@
+mod fetching;
+mod packages;
+
+use fetching::sk_fetcher::SilkSongFetcher;
+
 fn main() {
-    println!("Hello, world!");
+    let packages = SilkSongFetcher::new().fetch().unwrap();
+    println!("{:#?}", packages);
 }
