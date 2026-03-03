@@ -1,9 +1,9 @@
 use thiserror::Error;
 
-use crate::packages::package::SilkSongPackage;
+use crate::packages::sk_package::SilkSongPackage;
 
 #[derive(Debug, Error)]
-pub enum FetcherError {
+pub enum SilkSongFetcherError {
     #[error("reqwest error: {0}")]
     SilkSongFetcherError(String),
     #[error("Parsing error: {0}")]
@@ -19,13 +19,13 @@ impl SilkSongFetcher {
         Self
     }
 
-    pub fn fetch(&self) -> Result<Vec<SilkSongPackage>, FetcherError> {
+    pub fn fetch(&self) -> Result<Vec<SilkSongPackage>, SilkSongFetcherError> {
         let resp = reqwest::blocking::get(Self::URL)
-            .map_err(|e| FetcherError::SilkSongFetcherError(e.to_string()))?;
+            .map_err(|e| SilkSongFetcherError::SilkSongFetcherError(e.to_string()))?;
 
         let packages: Vec<SilkSongPackage> = resp
             .json()
-            .map_err(|e| FetcherError::JsonError(e.to_string()))?;
+            .map_err(|e| SilkSongFetcherError::JsonError(e.to_string()))?;
 
         Ok(packages)
     }
