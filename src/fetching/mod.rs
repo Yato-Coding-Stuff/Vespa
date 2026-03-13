@@ -1,1 +1,1 @@
-pub mod sk_fetcher;
+pub mod sk_package_fetcher;
