@@ -3,7 +3,8 @@ use std::{collections::HashMap, fs};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::packages::sk_package::SilkSongPackage;
+use crate::packages::SilkSongInstalledPackageRecord;
+
 
 #[derive(Debug, Error)]
 pub enum SilkSongPackageTrackerError {
@@ -16,7 +17,7 @@ pub enum SilkSongPackageTrackerError {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SilkSongPackageTracker {
-    pub packages: HashMap<String, SilkSongPackage>,
+    pub packages: HashMap<String, SilkSongInstalledPackageRecord>,
 }
 
 impl SilkSongPackageTracker {
@@ -36,11 +37,22 @@ impl SilkSongPackageTracker {
         Ok(())
     }
 
-    pub fn add_package(&mut self, package: SilkSongPackage) {
-        self.packages.insert(package.name.clone(), package);
+    pub fn add_installed_package_record(
+        &mut self,
+        package_name: String,
+        package: &SilkSongInstalledPackageRecord,
+    ) {
+        self.packages.insert(package_name, package.clone());
     }
 
-    pub fn get_package(&self, name: &str) -> Option<&SilkSongPackage> {
-        self.packages.get(name)
+    pub fn get_installed_package_record(
+        &self,
+        package_name: &str,
+    ) -> Option<&SilkSongInstalledPackageRecord> {
+        self.packages.get(package_name)
+    }
+
+    pub fn is_installed(&self, package_name: &str) -> bool {
+        self.packages.contains_key(package_name)
     }
 }

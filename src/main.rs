@@ -1,14 +1,15 @@
-mod fetching;
-mod installer;
+mod cli;
+mod handlers;
+mod manager;
 mod packages;
-mod downloading;
+mod profile_manager;
+mod tracker;
 mod util;
 
-use fetching::sk_package_fetcher::SilkSongPackageFetcher;
-
-use crate::{packages::sk_package::SilkSongIndex, util::config::Config};
+use crate::{cli::commands, util::context::Context};
 
 fn main() {
-    let config = Config::load().expect("Failed to load config");
-    println!("Config: {:#?}", config);
+    let mut context = Context::new().expect("Failed to create context");
+
+    commands::run(&mut context);
 }
