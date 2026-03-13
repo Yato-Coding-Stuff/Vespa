@@ -28,7 +28,7 @@ impl Config {
         fs::create_dir_all(&config_dir)?; // ✅ make sure folder exists
 
         let config = Config {
-            game_switcher: GameSwitcher::Undefined,
+            game_switcher: GameSwitcher::SilkSong,
             hollow_knight_path: home.join("code/private-git/yato/Vespa/resources/HK"),
             silk_song_path: home.join("code/private-git/yato/Vespa/resources/SK"),
             index_path: config_dir.join("index.json"),

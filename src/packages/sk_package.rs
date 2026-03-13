@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /*
  * Thunderstore's API sucks, so we're forced to do it like this.
  * */
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SilkSongPackage {
     pub name: String,
     pub owner: String,
@@ -14,7 +14,7 @@ pub struct SilkSongPackage {
     pub versions: Vec<SilkSongVersion>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SilkSongVersion {
     pub full_name: String,
     pub description: String,
