@@ -88,6 +88,7 @@ fn handle_user_choice_installation(
             "Do you want to {} {}?",
             action_name, package.package_full_name_with_version
         ))
+        .report(false)
         .interact()
         .unwrap();
 
@@ -129,6 +130,7 @@ pub fn install(
                 .collect::<Vec<String>>()
                 .join("\n - ")
         ))
+        .report(false)
         .interact()
         .unwrap()
     {
