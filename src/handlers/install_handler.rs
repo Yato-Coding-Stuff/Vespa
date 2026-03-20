@@ -24,9 +24,6 @@ pub enum InstallResult {
 
 #[derive(Debug, Error)]
 pub enum InstallError {
-    #[error("Mod not found: {0}")]
-    ModNotFound(String),
-
     #[error(transparent)]
     ManagerError(#[from] SilkSongPackageManagerError),
 
@@ -47,7 +44,7 @@ pub fn run<F: FnMut(InstallEvent)>(
     let requested_version = package.version_number.parse::<Version>().unwrap();
 
     if !force {
-        match ctx.tracker.get(&package.package_full_name_with_version) {
+        match ctx.tracker.get(&package.package_full_name) {
             None => {} // Not installed, proceed normally
             Some(installed) => {
                 let installed_version = installed

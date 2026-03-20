@@ -29,11 +29,12 @@ impl SilkSongPackageTracker {
                         (&folder_name[..], None)
                     };
                     let record = SilkSongInstalledPackageRecord {
+                        package_full_name_with_version: folder_name.to_string(),
                         package_full_name: name.to_string(),
                         version_number: version.map(|v| v.to_string()),
                         file_path: path.clone(),
                     };
-                    self.packages.insert(folder_name.to_string(), record);
+                    self.packages.insert(name.to_string(), record);
                 }
             }
         }
@@ -41,6 +42,7 @@ impl SilkSongPackageTracker {
 
     pub fn add(&mut self, package: &SilkSongFlattenedPackage, file_path: &Path) {
         let record = SilkSongInstalledPackageRecord {
+            package_full_name_with_version: package.package_full_name_with_version.clone(),
             package_full_name: package.package_full_name.clone(),
             version_number: Some(package.version_number.clone()),
             file_path: file_path.to_path_buf(),
@@ -49,19 +51,15 @@ impl SilkSongPackageTracker {
             .insert(package.package_full_name.clone(), record);
     }
 
-    pub fn remove(&mut self, package_name_with_version: &str) {
-        self.packages.remove(package_name_with_version);
+    pub fn remove(&mut self, package_full_name: &str) {
+        self.packages.remove(package_full_name);
     }
 
-    pub fn is_installed(&self, package_name_with_version: &str) -> bool {
-        self.packages.contains_key(package_name_with_version)
+    pub fn get(&self, package_full_name: &str) -> Option<&SilkSongInstalledPackageRecord> {
+        self.packages.get(package_full_name)
     }
 
-    pub fn get(&self, package_name_with_version: &str) -> Option<&SilkSongInstalledPackageRecord> {
-        self.packages.get(package_name_with_version)
-    }
-
-    pub fn list_installed(&self) -> Vec<&SilkSongInstalledPackageRecord> {
-        self.packages.values().collect()
+    pub fn get_all(&self) -> HashMap<String, SilkSongInstalledPackageRecord> {
+        self.packages.clone()
     }
 }
