@@ -25,9 +25,7 @@ impl fmt::Display for GameSwitcher {
 pub struct Config {
     pub game_switcher: GameSwitcher,
     pub hollow_knight_path: PathBuf,
-    pub default_hollow_knight_profile: String,
     pub silk_song_path: PathBuf,
-    pub default_silk_song_profile: String,
     pub index_path: PathBuf,
 }
 
@@ -40,9 +38,7 @@ impl Config {
         let config = Config {
             game_switcher: GameSwitcher::SilkSong,
             hollow_knight_path: home.join("code/git/yato/Vespa/resources/HK"),
-            default_hollow_knight_profile: "default".to_string(),
             silk_song_path: home.join("code/git/yato/Vespa/resources/SK"),
-            default_silk_song_profile: "default".to_string(),
             index_path: config_dir.join("index.json"),
         };
 

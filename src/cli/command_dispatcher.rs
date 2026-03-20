@@ -7,10 +7,7 @@ use crate::{
         presenter::presenter::Presenter,
     },
     profile_manager::sk_profile_manager::SilkSongProfileManager,
-    util::{
-        config::{Config, GameSwitcher},
-        context::Context,
-    },
+    util::{config::Config, context::Context},
 };
 
 pub fn run(ctx: &mut Context) {
@@ -24,10 +21,7 @@ pub fn run(ctx: &mut Context) {
 
     let profile = match args.profile {
         Some(profile) => profile,
-        None => match game {
-            GameSwitcher::HollowKnight => ctx.config.default_hollow_knight_profile.clone(),
-            GameSwitcher::SilkSong => ctx.config.default_silk_song_profile.clone(),
-        },
+        None => "default".to_string(),
     };
 
     let profile_manager = SilkSongProfileManager::new(Config::config_dir());
