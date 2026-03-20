@@ -18,14 +18,14 @@ impl Event for ProfileManagerEvent {
         match self {
             ProfileManagerEvent::CreatingProfileDirectory { name, game, path } => {
                 println!(
-                    "==> Creating profile directory for profile {} ({}) at {}",
-                    name, game, path
+                    "==> Creating profile directory for profile {} ({}) at wouldnt you like to know where?",
+                    name, game
                 );
             }
             ProfileManagerEvent::InstallingBepInEx { name, game, path } => {
                 println!(
-                    "==> Installing BepInEx for profile {} ({}) at {}",
-                    name, game, path
+                    "==> Installing BepInEx for profile {} ({}) at wouldnt you like to know where?",
+                    name, game
                 );
             }
         }

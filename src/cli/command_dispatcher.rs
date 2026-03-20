@@ -24,6 +24,7 @@ pub fn run(ctx: &mut Context) {
         None => "default".to_string(),
     };
 
+
     let profile_manager = SilkSongProfileManager::new(Config::config_dir());
     let profile_path = profile_manager
         .ensure_profile(ctx, &mut presenter, &game, &profile)
@@ -32,6 +33,8 @@ pub fn run(ctx: &mut Context) {
             std::process::exit(1);
         })
         .unwrap();
+
+    ctx.tracker.scan_plugins(&profile_path);
 
     match args.sub {
         SubArgs::Install { packages } => {

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::packages::sk_package::{SilkSongFlattenedPackage, SilkSongPackage};
+use crate::packages::sk_package::SilkSongPackage;
 
 #[derive(Debug, Error)]
 pub(crate) enum SilkSongFetcherError {
@@ -23,7 +23,6 @@ impl SilkSongPackageFetcher {
         let packages: Vec<SilkSongPackage> = resp
             .json()
             .map_err(|e| SilkSongFetcherError::JsonError(e.to_string()))?;
-
 
         Ok(packages)
     }

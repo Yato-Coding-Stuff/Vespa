@@ -1,4 +1,7 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use thiserror::Error;
 
@@ -62,6 +65,7 @@ impl SilkSongProfileManager {
             });
             self.install_bepinex(ctx, presenter, &profile_dir)?;
         }
+
         Ok(profile_dir)
     }
 
@@ -78,7 +82,7 @@ impl SilkSongProfileManager {
         &self,
         ctx: &mut Context,
         presenter: &mut Presenter,
-        profile_dir: &PathBuf,
+        profile_dir: &Path,
     ) -> Result<(), SilkSongProfileManagerError> {
         let mut install_progress = |event: InstallEvent| {
             presenter.display(&event);
@@ -86,10 +90,11 @@ impl SilkSongProfileManager {
 
         let bepinex = ctx
             .index
-            .get_latest_package_by_package_name("BepInExPack_Silksong")
+            .get_latest_package_by_package_name("BepInEx-BepInExPack_Silksong")
             .unwrap();
         let pm = SilkSongPackageManager::new();
         pm.install_bepinex(ctx, &bepinex, &mut install_progress, profile_dir)?;
+        install_progress(InstallEvent::Finished);
 
         Ok(())
     }

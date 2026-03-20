@@ -8,9 +8,6 @@ use zip::{ZipArchive, result::ZipError};
 
 #[derive(Debug, Error)]
 pub enum FileHandlerError {
-    #[error("The package is already installed")]
-    PackageAlreadyInstalled,
-
     #[error("Failed to open zip archive: {0}")]
     OpenZipError(#[source] io::Error),
 

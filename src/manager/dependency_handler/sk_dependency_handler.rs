@@ -69,17 +69,21 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
             SilkSongDependencyHandlerError::VersionParseError(package.version_number.clone())
         })?;
 
-        if let Some(installed) = ctx
-            .tracker
-            .get_installed_package_record(&package.package_name)
-        {
-            if installed.version_number >= parsed_required_version {
+        if let Some(installed) = ctx.tracker.get(&package.package_full_name) {
+            let installed_version = installed
+                .version_number
+                .as_deref() // Option<&str>
+                .unwrap_or("0.0.0") // default if missing
+                .parse::<Version>() // parse to Version
+                .unwrap_or_else(|_| Version::new(0, 0, 0)); // fallback if parse fails
+
+            if installed_version >= parsed_required_version {
                 progress(InstallEvent::DependencyAlreadyInstalled);
                 return Ok(());
             } else {
                 progress(InstallEvent::UpdatingDependency {
-                    name: package.package_name.clone(),
-                    old_version: installed.version_number.to_string(),
+                    name: package.package_full_name.clone(),
+                    old_version: installed_version.to_string(),
                     new_version: package.version_number.clone(),
                 });
                 self.package_manager
@@ -87,7 +91,7 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
                     .map_err(|e| {
                         SilkSongDependencyHandlerError::InstallError(format!(
                             "Failed to update {}: {:?}",
-                            package.package_name, e
+                            package.package_full_name_with_version, e
                         ))
                     })?;
                 return Ok(());
@@ -95,14 +99,14 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
         }
 
         progress(InstallEvent::InstallingDependency {
-            name: package.package_name_with_version.clone(),
+            name: package.package_full_name_with_version.clone(),
         });
         self.package_manager
             .install_package(ctx, &package, progress, profile_path)
             .map_err(|e| {
                 SilkSongDependencyHandlerError::InstallError(format!(
                     "Failed to install {}: {:?}",
-                    package.package_name, e
+                    package.package_full_name_with_version, e
                 ))
             })?;
 

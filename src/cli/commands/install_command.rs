@@ -21,7 +21,7 @@ fn input_handling(
         if let Some(package) = ctx.index.get_package_by_full_name(&package) {
             println!(
                 "==> Exact match found: {}",
-                package.package_name_with_version
+                package.package_full_name_with_version
             );
             optional_packages.push(Some(package));
         } else {
@@ -86,17 +86,20 @@ fn handle_user_choice_installation(
     let confirm = Confirm::new()
         .with_prompt(format!(
             "Do you want to {} {}?",
-            action_name, package.package_name_with_version
+            action_name, package.package_full_name_with_version
         ))
         .interact()
         .unwrap();
 
     if confirm {
         match install_handler::run(ctx, package, true, presenter, profile_path) {
-            Ok(_) => println!("==> {} {}", action_name, package.package_name_with_version),
+            Ok(_) => println!(
+                "==> {} {}",
+                action_name, package.package_full_name_with_version
+            ),
             Err(e) => println!(
                 "==> Failed to {} {}: {e}",
-                action_name, package.package_name_with_version
+                action_name, package.package_full_name_with_version
             ),
         }
     }
@@ -122,7 +125,7 @@ pub fn install(
             "Do you want to install the following packages?\n - {}",
             packages
                 .iter()
-                .map(|p| p.package_name_with_version.clone())
+                .map(|p| p.package_full_name_with_version.clone())
                 .collect::<Vec<String>>()
                 .join("\n - ")
         ))
@@ -136,12 +139,12 @@ pub fn install(
     for package in packages {
         match install_handler::run(ctx, package, false, &mut presenter, profile_path) {
             Ok(InstallResult::Installed) => {
-                println!("==> Installed {}", package.package_name_with_version);
+                println!("==> Installed {}", package.package_full_name_with_version);
             }
             Ok(InstallResult::AlreadyInstalled) => {
                 println!(
                     "==> {} is already installed",
-                    package.package_name_with_version
+                    package.package_full_name_with_version
                 );
                 handle_user_choice_installation(
                     ctx,
@@ -154,7 +157,7 @@ pub fn install(
             Ok(InstallResult::NewerVersionInstalled) => {
                 println!(
                     "==> {} has an older version installed",
-                    package.package_name
+                    package.package_full_name_with_version
                 );
                 handle_user_choice_installation(
                     ctx,
@@ -165,7 +168,10 @@ pub fn install(
                 );
             }
             Ok(InstallResult::OlderVersionInstalled) => {
-                println!("==> {} has a newer version installed", package.package_name);
+                println!(
+                    "==> {} has a newer version installed",
+                    package.package_full_name_with_version
+                );
                 handle_user_choice_installation(
                     ctx,
                     package,
@@ -177,7 +183,7 @@ pub fn install(
             Err(e) => {
                 println!(
                     "==> Failed to install {}: {e}",
-                    package.package_name_with_version
+                    package.package_full_name_with_version
                 );
             }
         }

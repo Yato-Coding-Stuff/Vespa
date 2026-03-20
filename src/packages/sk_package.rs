@@ -1,6 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
-use semver::Version;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -12,7 +14,7 @@ use crate::packages::sk_package_fetcher::{SilkSongFetcherError, SilkSongPackageF
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(super) struct SilkSongPackage {
-    pub(super) name: String,
+    pub(super) full_name: String,
     pub(super) owner: String,
     pub(super) package_url: String,
     pub(super) versions: Vec<SilkSongVersion>,
@@ -31,19 +33,28 @@ pub(super) struct SilkSongVersion {
 // simplify tracker to use file-based source-of-truth
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SilkSongInstalledPackageRecord {
-    pub version_full_name: String,
-    pub version_number: Version,
+    pub package_full_name: String,
+    pub version_number: Option<String>,
+    pub file_path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
 pub struct SilkSongFlattenedPackage {
-    pub package_name: String,
+    pub package_full_name: String,
     pub owner: String,
-    pub package_name_with_version: String,
+    pub package_full_name_with_version: String,
     pub description: String,
     pub download_url: String,
     pub version_number: String,
     pub dependencies: Vec<String>,
+}
+
+pub fn split_package_name_with_version(package_name_with_version: &str) -> (&str, &str) {
+    if let Some((name, version)) = package_name_with_version.rsplit_once('-') {
+        (name, version)
+    } else {
+        (package_name_with_version, "0.0.0")
+    }
 }
 
 #[derive(Debug, Error)]
@@ -59,28 +70,35 @@ pub struct SilkSongIndex {
 }
 
 impl SilkSongIndex {
-    pub fn new() -> Result<Self, SilkSongIndexError> {
+    pub fn new(blacklist: &[&str]) -> Result<Self, SilkSongIndexError> {
         let packages = SilkSongPackageFetcher::fetch()?;
 
         let mut packages_by_full_name = HashMap::new();
         let mut latest_full_name_by_package_name = HashMap::new();
 
+        let blacklist: HashSet<&str> = blacklist.iter().copied().collect();
+
         for package in packages {
             for (i, ver) in package.versions.into_iter().enumerate() {
+                let filtered_deps = ver.dependencies.into_iter().filter(|dep| {
+                    let (base_name, _) = split_package_name_with_version(dep);
+                    !blacklist.contains(base_name)
+                });
+
                 let flattened = SilkSongFlattenedPackage {
-                    package_name: package.name.clone(),
+                    package_full_name: package.full_name.clone(),
                     owner: package.owner.clone(),
-                    package_name_with_version: ver.full_name.clone(),
+                    package_full_name_with_version: ver.full_name.clone(),
                     description: ver.description,
                     download_url: ver.download_url,
                     version_number: ver.version_number,
-                    dependencies: ver.dependencies,
+                    dependencies: filtered_deps.collect(),
                 };
 
                 packages_by_full_name.insert(ver.full_name.clone(), flattened.clone());
                 if i == 0 {
                     latest_full_name_by_package_name
-                        .insert(package.name.clone(), ver.full_name.clone());
+                        .insert(package.full_name.clone(), ver.full_name.clone());
                 }
             }
         }
@@ -93,12 +111,6 @@ impl SilkSongIndex {
 
     pub fn get_package_by_full_name(&self, full_name: &str) -> Option<SilkSongFlattenedPackage> {
         self.packages_by_full_name.get(full_name).cloned()
-    }
-
-    pub fn get_latest_full_name_by_package_name(&self, package_name: &str) -> Option<String> {
-        self.latest_full_name_by_package_name
-            .get(package_name)
-            .cloned()
     }
 
     pub fn get_latest_package_by_package_name(

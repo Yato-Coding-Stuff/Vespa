@@ -1,11 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use semver::Version;
 use tempfile::TempDir;
 use thiserror::Error;
 
 use crate::{
-    packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
+    packages::SilkSongFlattenedPackage,
     util::{
         context::Context,
         file_handler::{FileHandlerError, recursively_copy_dir, unzip_to_dir},
@@ -44,18 +43,10 @@ impl SilkSongPackageInstaller {
         let mod_path = profile_path
             .join("BepInEx")
             .join("plugins")
-            .join(&package.package_name);
+            .join(&package.package_full_name_with_version);
         recursively_copy_dir(&unzip_dir, &mod_path)?;
 
-        let version: Version = Version::parse(&package.version_number)?;
-
-        let installed_package = SilkSongInstalledPackageRecord {
-            version_full_name: package.package_name_with_version.clone(),
-            version_number: version,
-        };
-
-        ctx.tracker
-            .add_installed_package_record(package.package_name.clone(), &installed_package);
+        ctx.tracker.add(package, &mod_path);
 
         Ok(())
     }
@@ -65,7 +56,7 @@ impl SilkSongPackageInstaller {
         ctx: &mut Context,
         package: &SilkSongFlattenedPackage,
         dir: &TempDir,
-        bepinex_path: &PathBuf,
+        bepinex_path: &Path,
     ) -> Result<(), SilkSongPackageInstallerError> {
         let zip_path = dir.path().join("package.zip");
         let unzip_dir = dir.path().join("unzipped");
@@ -75,15 +66,7 @@ impl SilkSongPackageInstaller {
 
         recursively_copy_dir(&bepinexpack_path, bepinex_path)?;
 
-        let version: Version = Version::parse(&package.version_number)?;
-
-        let installed_package = SilkSongInstalledPackageRecord {
-            version_full_name: package.package_name_with_version.clone(),
-            version_number: version,
-        };
-
-        ctx.tracker
-            .add_installed_package_record(package.package_name.clone(), &installed_package);
+        ctx.tracker.add(package, &bepinex_path);
 
         Ok(())
     }

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
@@ -12,7 +12,7 @@ use crate::{
             SilkSongPackageInstaller, SilkSongPackageInstallerError,
         },
     },
-    packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
+    packages::SilkSongFlattenedPackage,
 };
 
 #[derive(Debug, Error)]
@@ -21,6 +21,8 @@ pub enum SilkSongPackageManagerError {
     DownloaderError(#[from] SilkSongPackageDownloaderError),
     #[error(transparent)]
     InstallerError(#[from] SilkSongPackageInstallerError),
+    #[error("Package is blacklisted: {0}")]
+    PackageBlacklisted(String),
 }
 
 pub struct SilkSongPackageManager {
@@ -43,28 +45,28 @@ impl SilkSongPackageManager {
         progress: &mut F,
         profile_path: &PathBuf,
     ) -> Result<(), SilkSongPackageManagerError> {
+        if ctx.black_list.contains(&package.package_full_name.as_str()) {
+            return Err(SilkSongPackageManagerError::PackageBlacklisted(
+                package.package_full_name_with_version.clone(),
+            ));
+        }
+
         progress(InstallEvent::DownloadingMod {
-            name: package.package_name_with_version.clone(),
+            name: package.package_full_name_with_version.clone(),
         });
         let zip_dir = self.downloader.download(&package.download_url, progress)?;
 
+        progress(InstallEvent::FinishedDownloadingMod {
+            name: package.package_full_name_with_version.clone(),
+        });
         progress(InstallEvent::InstallingMod {
-            name: package.package_name_with_version.clone(),
+            name: package.package_full_name_with_version.clone(),
         });
         match self
             .installer
             .install_package(ctx, package, &zip_dir, profile_path)
         {
-            Ok(_) => {
-                let package_record = SilkSongInstalledPackageRecord {
-                    version_full_name: package.package_name_with_version.clone(),
-                    version_number: package.version_number.parse().unwrap(),
-                };
-                ctx.tracker
-                    .add_installed_package_record(package.package_name.clone(), &package_record);
-
-                Ok(())
-            }
+            Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }
     }
@@ -74,23 +76,20 @@ impl SilkSongPackageManager {
         ctx: &mut crate::util::context::Context,
         package: &SilkSongFlattenedPackage,
         progress: &mut F,
-        bepinex_path: &PathBuf,
+        bepinex_path: &Path,
     ) -> Result<(), SilkSongPackageManagerError> {
         let zip_dir = self.downloader.download(&package.download_url, progress)?;
+        progress(InstallEvent::FinishedDownloadingMod {
+            name: package.package_full_name_with_version.clone(),
+        });
+        progress(InstallEvent::InstallingMod {
+            name: package.package_full_name_with_version.clone(),
+        });
         match self
             .installer
             .install_bepinex(ctx, package, &zip_dir, bepinex_path)
         {
-            Ok(_) => {
-                let package_record = SilkSongInstalledPackageRecord {
-                    version_full_name: package.package_name_with_version.clone(),
-                    version_number: package.version_number.parse().unwrap(),
-                };
-                ctx.tracker
-                    .add_installed_package_record(package.package_name.clone(), &package_record);
-
-                Ok(())
-            }
+            Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }
     }
