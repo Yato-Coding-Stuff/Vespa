@@ -60,7 +60,7 @@ impl SilkSongProfileManager {
                 game: game.to_string(),
                 path: bepinex_dir.to_string_lossy().to_string(),
             });
-            self.install_bepinex(ctx, presenter, &bepinex_dir)?;
+            self.install_bepinex(ctx, presenter, &profile_dir)?;
         }
         Ok(profile_dir)
     }
@@ -78,15 +78,18 @@ impl SilkSongProfileManager {
         &self,
         ctx: &mut Context,
         presenter: &mut Presenter,
-        bepinex_dir: &PathBuf,
+        profile_dir: &PathBuf,
     ) -> Result<(), SilkSongProfileManagerError> {
         let mut install_progress = |event: InstallEvent| {
             presenter.display(&event);
         };
 
+        let bepinex = ctx
+            .index
+            .get_latest_package_by_package_name("BepInExPack_Silksong")
+            .unwrap();
         let pm = SilkSongPackageManager::new();
-        // TODO
-        // implement a specific BepInEx install function, as it needs to be handled differently
+        pm.install_bepinex(ctx, &bepinex, &mut install_progress, profile_dir)?;
 
         Ok(())
     }

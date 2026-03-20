@@ -16,7 +16,7 @@ impl SilkSongPackageFetcher {
     const URL: &'static str = "https://thunderstore.io/c/hollow-knight-silksong/api/v1/package/";
 
     /// Fetch packages and immediately flatten them into SilkSongFlattenedPackage
-    pub fn fetch() -> Result<Vec<SilkSongFlattenedPackage>, SilkSongFetcherError> {
+    pub fn fetch() -> Result<Vec<SilkSongPackage>, SilkSongFetcherError> {
         let resp = reqwest::blocking::get(Self::URL)
             .map_err(|e| SilkSongFetcherError::SilkSongFetcherError(e.to_string()))?;
 
@@ -24,23 +24,7 @@ impl SilkSongPackageFetcher {
             .json()
             .map_err(|e| SilkSongFetcherError::JsonError(e.to_string()))?;
 
-        let flattened: Vec<SilkSongFlattenedPackage> = packages
-            .into_iter()
-            .flat_map(|p| {
-                p.versions
-                    .into_iter()
-                    .map(move |v| SilkSongFlattenedPackage {
-                        package_name: p.name.clone(),
-                        owner: p.owner.clone(),
-                        package_name_with_version: v.full_name,
-                        description: v.description,
-                        download_url: v.download_url,
-                        version_number: v.version_number,
-                        dependencies: v.dependencies,
-                    })
-            })
-            .collect();
 
-        Ok(flattened)
+        Ok(packages)
     }
 }

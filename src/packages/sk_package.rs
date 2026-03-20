@@ -55,29 +55,39 @@ pub enum SilkSongIndexError {
 #[derive(Debug)]
 pub struct SilkSongIndex {
     pub packages_by_full_name: HashMap<String, SilkSongFlattenedPackage>,
-    pub full_name_by_package_name: HashMap<String, String>,
+    pub latest_full_name_by_package_name: HashMap<String, String>,
 }
 
 impl SilkSongIndex {
     pub fn new() -> Result<Self, SilkSongIndexError> {
-        let flattened_packages = SilkSongPackageFetcher::fetch()?;
+        let packages = SilkSongPackageFetcher::fetch()?;
 
         let mut packages_by_full_name = HashMap::new();
-        let mut full_name_by_package_name = HashMap::new();
+        let mut latest_full_name_by_package_name = HashMap::new();
 
-        for package in flattened_packages {
-            packages_by_full_name
-                .insert(package.package_name_with_version.clone(), package.clone());
+        for package in packages {
+            for (i, ver) in package.versions.into_iter().enumerate() {
+                let flattened = SilkSongFlattenedPackage {
+                    package_name: package.name.clone(),
+                    owner: package.owner.clone(),
+                    package_name_with_version: ver.full_name.clone(),
+                    description: ver.description,
+                    download_url: ver.download_url,
+                    version_number: ver.version_number,
+                    dependencies: ver.dependencies,
+                };
 
-            full_name_by_package_name.insert(
-                package.package_name.clone(),
-                package.package_name_with_version.clone(),
-            );
+                packages_by_full_name.insert(ver.full_name.clone(), flattened.clone());
+                if i == 0 {
+                    latest_full_name_by_package_name
+                        .insert(package.name.clone(), ver.full_name.clone());
+                }
+            }
         }
 
         Ok(Self {
             packages_by_full_name,
-            full_name_by_package_name,
+            latest_full_name_by_package_name,
         })
     }
 
@@ -85,7 +95,19 @@ impl SilkSongIndex {
         self.packages_by_full_name.get(full_name).cloned()
     }
 
-    pub fn get_full_name_by_package_name(&self, package_name: &str) -> Option<String> {
-        self.full_name_by_package_name.get(package_name).cloned()
+    pub fn get_latest_full_name_by_package_name(&self, package_name: &str) -> Option<String> {
+        self.latest_full_name_by_package_name
+            .get(package_name)
+            .cloned()
+    }
+
+    pub fn get_latest_package_by_package_name(
+        &self,
+        package_name: &str,
+    ) -> Option<SilkSongFlattenedPackage> {
+        self.latest_full_name_by_package_name
+            .get(package_name)
+            .and_then(|full_name| self.packages_by_full_name.get(full_name))
+            .cloned()
     }
 }

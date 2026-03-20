@@ -17,6 +17,8 @@ use crate::{manager::sk_package_manager::SilkSongPackageManager, util::context::
 pub enum InstallResult {
     Installed,
     AlreadyInstalled,
+    OlderVersionInstalled,
+    NewerVersionInstalled,
 }
 
 #[derive(Debug, Error)]
@@ -41,14 +43,32 @@ pub fn run<F: FnMut(InstallEvent)>(
     let pm: SilkSongPackageManager = SilkSongPackageManager::new();
     let dependency_manager: SilkSongDependencyHandler = SilkSongDependencyHandler::new(&pm);
 
-    if ctx.tracker.is_installed(&package.package_name) && !force {
-        return Ok(InstallResult::AlreadyInstalled);
+    let requested_version = package.version_number.parse().unwrap();
+
+    if !force {
+        match ctx
+            .tracker
+            .get_installed_package_record(&package.package_name)
+        {
+            None => {} // Not installed, proceed normally
+            Some(installed) => {
+                // Compare versions
+                let result = if installed.version_number == requested_version {
+                    InstallResult::AlreadyInstalled
+                } else if installed.version_number > requested_version {
+                    InstallResult::OlderVersionInstalled
+                } else {
+                    InstallResult::NewerVersionInstalled
+                };
+                return Ok(result);
+            }
+        }
     }
 
     dependency_manager
         .handle_dependencies(ctx, package.dependencies.clone(), progress, profile_path)
         .map_err(InstallError::DependencyErrors)?;
-    pm.install_package(ctx, &package, progress, profile_path)?;
+    pm.install_package(ctx, package, progress, profile_path)?;
 
     ctx.tracker.save(ctx.config.index_path.to_str().unwrap());
 

@@ -68,4 +68,30 @@ impl SilkSongPackageManager {
             Err(e) => Err(e.into()),
         }
     }
+
+    pub fn install_bepinex<F: FnMut(InstallEvent)>(
+        &self,
+        ctx: &mut crate::util::context::Context,
+        package: &SilkSongFlattenedPackage,
+        progress: &mut F,
+        bepinex_path: &PathBuf,
+    ) -> Result<(), SilkSongPackageManagerError> {
+        let zip_dir = self.downloader.download(&package.download_url, progress)?;
+        match self
+            .installer
+            .install_bepinex(ctx, package, &zip_dir, bepinex_path)
+        {
+            Ok(_) => {
+                let package_record = SilkSongInstalledPackageRecord {
+                    version_full_name: package.package_name_with_version.clone(),
+                    version_number: package.version_number.parse().unwrap(),
+                };
+                ctx.tracker
+                    .add_installed_package_record(package.package_name.clone(), &package_record);
+
+                Ok(())
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
 }

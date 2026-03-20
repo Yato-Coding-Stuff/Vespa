@@ -6,10 +6,10 @@ mod profile_manager;
 mod tracker;
 mod util;
 
-use crate::{cli::commands, util::context::Context};
+use crate::{cli::command_dispatcher, util::context::Context};
 
 fn main() {
     let mut context = Context::new().expect("Failed to create context");
 
-    commands::run(&mut context);
+    command_dispatcher::run(&mut context);
 }

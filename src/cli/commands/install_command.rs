@@ -1,59 +1,15 @@
+use dialoguer::Confirm;
+use dialoguer::Input;
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use std::path::PathBuf;
 
-use clap::Parser;
-use dialoguer::{Confirm, Input};
-use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
-
 use crate::{
-    cli::{
-        args::{Arg, SubArgs},
-        presenter::presenter::Presenter,
-    }, handlers::install_handler::{self, InstallResult}, packages::SilkSongFlattenedPackage, profile_manager::sk_profile_manager::SilkSongProfileManager, util::{
-        config::{Config, GameSwitcher},
-        context::Context,
-    }
+    cli::presenter::{events::install_event::InstallEvent, presenter::Presenter},
+    handlers::install_handler::{self, InstallResult},
+    packages::SilkSongFlattenedPackage,
+    util::context::Context,
 };
-
-pub fn run(ctx: &mut Context) {
-    let args = Arg::parse();
-    let mut presenter = Presenter::new();
-
-    let game = match args.game {
-        Some(game) => game.into(),
-        None => ctx.config.game_switcher.clone(),
-    };
-
-    let profile = match args.profile {
-        Some(profile) => profile,
-        None => match game {
-            GameSwitcher::HollowKnight => ctx.config.default_hollow_knight_profile.clone(),
-            GameSwitcher::SilkSong => ctx.config.default_silk_song_profile.clone(),
-        },
-    };
-
-    // TODO
-    // own function
-    let profile_manager = SilkSongProfileManager::new(Config::config_dir());
-    let profile_path = profile_manager
-        .ensure_profile(ctx, &mut presenter, &game, &profile)
-        .map_err(|err| {
-            println!("{}", err);
-            std::process::exit(1);
-        })
-        .unwrap();
-
-    match args.sub {
-        SubArgs::Install { packages } => {
-            // TODO
-            // profile path should not be last argument
-            // carries on through the entire install-chain
-            install(ctx, &mut presenter, packages, &profile_path);
-        }
-        _ => {
-            todo!()
-        }
-    }
-}
 
 fn input_handling(
     ctx: &mut Context,
@@ -74,7 +30,7 @@ fn input_handling(
 
             let mut matches = ctx
                 .index
-                .full_name_by_package_name
+                .latest_full_name_by_package_name
                 .iter()
                 .filter_map(|(name, pkg)| {
                     matcher
@@ -120,7 +76,33 @@ fn input_handling(
     optional_packages
 }
 
-fn install(
+fn handle_user_choice_installation(
+    ctx: &mut Context,
+    package: &SilkSongFlattenedPackage,
+    presenter: &mut impl FnMut(InstallEvent),
+    profile_path: &PathBuf,
+    action_name: &str,
+) {
+    let confirm = Confirm::new()
+        .with_prompt(format!(
+            "Do you want to {} {}?",
+            action_name, package.package_name_with_version
+        ))
+        .interact()
+        .unwrap();
+
+    if confirm {
+        match install_handler::run(ctx, package, true, presenter, profile_path) {
+            Ok(_) => println!("==> {} {}", action_name, package.package_name_with_version),
+            Err(e) => println!(
+                "==> Failed to {} {}: {e}",
+                action_name, package.package_name_with_version
+            ),
+        }
+    }
+}
+
+pub fn install(
     ctx: &mut Context,
     presenter: &mut Presenter,
     packages: Vec<String>,
@@ -150,33 +132,48 @@ fn install(
         println!("==> Aborted installation");
         return;
     }
+
     for package in packages {
         match install_handler::run(ctx, package, false, &mut presenter, profile_path) {
             Ok(InstallResult::Installed) => {
-                println!(
-                    "==> Installed {}",
-                    package.package_name_with_version.clone()
-                );
+                println!("==> Installed {}", package.package_name_with_version);
             }
             Ok(InstallResult::AlreadyInstalled) => {
-                let reinstall = Confirm::new()
-                    .with_prompt("Package already installed. Reinstall?")
-                    .interact()
-                    .unwrap();
-
-                if !reinstall {
-                    continue;
-                }
-
-                match install_handler::run(ctx, package, true, &mut presenter, profile_path) {
-                    Ok(_) => println!("==> Reinstalled {}", package.package_name_with_version),
-                    Err(e) => println!(
-                        "==> Failed to reinstall {}: {e}",
-                        package.package_name_with_version
-                    ),
-                }
+                println!(
+                    "==> {} is already installed",
+                    package.package_name_with_version
+                );
+                handle_user_choice_installation(
+                    ctx,
+                    package,
+                    &mut presenter,
+                    profile_path,
+                    "reinstall",
+                );
             }
-
+            Ok(InstallResult::NewerVersionInstalled) => {
+                println!(
+                    "==> {} has an older version installed",
+                    package.package_name
+                );
+                handle_user_choice_installation(
+                    ctx,
+                    package,
+                    &mut presenter,
+                    profile_path,
+                    "upgrade",
+                );
+            }
+            Ok(InstallResult::OlderVersionInstalled) => {
+                println!("==> {} has a newer version installed", package.package_name);
+                handle_user_choice_installation(
+                    ctx,
+                    package,
+                    &mut presenter,
+                    profile_path,
+                    "downgrade",
+                );
+            }
             Err(e) => {
                 println!(
                     "==> Failed to install {}: {e}",
