@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use tempfile::TempDir;
 use thiserror::Error;
@@ -7,7 +10,7 @@ use crate::{
     packages::SilkSongFlattenedPackage,
     util::{
         context::Context,
-        file_handler::{FileHandlerError, recursively_copy_dir, unzip_to_dir},
+        file_handler::{FileHandlerError, delete_dir, recursively_copy_dir, unzip_to_dir},
     },
 };
 
@@ -15,6 +18,8 @@ use crate::{
 pub enum SilkSongPackageInstallerError {
     #[error("The package is already installed")]
     PackageAlreadyInstalled,
+    #[error("The package is not installed")]
+    PackageNotInstalled,
     #[error(transparent)]
     FileHandlingError(#[from] FileHandlerError),
     #[error(transparent)]
@@ -47,6 +52,25 @@ impl SilkSongPackageInstaller {
         recursively_copy_dir(&unzip_dir, &mod_path)?;
 
         ctx.tracker.add(package, &mod_path);
+
+        Ok(())
+    }
+
+    pub fn uninstall_package(
+        &self,
+        ctx: &mut Context,
+        package: &SilkSongFlattenedPackage,
+        profile_path: &PathBuf,
+    ) -> Result<(), SilkSongPackageInstallerError> {
+        let installed_package = match ctx.tracker.get(&package.package_full_name) {
+            Some(p) => p,
+            None => return Err(SilkSongPackageInstallerError::PackageNotInstalled),
+        };
+
+        delete_dir(&installed_package.file_path)
+            .map_err(SilkSongPackageInstallerError::FileHandlingError)?;
+
+        ctx.tracker.remove(&package.package_full_name);
 
         Ok(())
     }

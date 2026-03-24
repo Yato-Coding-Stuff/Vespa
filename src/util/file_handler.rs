@@ -26,6 +26,9 @@ pub enum FileHandlerError {
     #[error("Failed to create directory when copying: {0}")]
     CreateDirError(#[source] io::Error),
 
+    #[error("Failed to delete directory: {0}")]
+    DeleteDirError(#[source] io::Error),
+
     #[error("Failed to copy file: {0}")]
     CopyFileError(#[source] io::Error),
 }
@@ -52,6 +55,11 @@ pub fn unzip_to_dir(zip_path: &Path, dest_dir: &Path) -> Result<(), FileHandlerE
             copy(&mut file, &mut outfile).map_err(FileHandlerError::CopyZipFileError)?;
         }
     }
+    Ok(())
+}
+
+pub fn delete_dir(dir: &Path) -> Result<(), FileHandlerError> {
+    fs::remove_dir_all(dir).map_err(FileHandlerError::DeleteDirError)?;
     Ok(())
 }
 

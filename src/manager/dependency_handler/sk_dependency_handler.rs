@@ -4,9 +4,12 @@ use semver::Version;
 use thiserror::Error;
 
 use crate::{
-    cli::presenter::events::install_event::InstallEvent,
-    manager::sk_package_manager::SilkSongPackageManager, util::context::Context,
+    cli::presenter::events::{install_event::InstallEvent, uninstall_event::UninstallEvent},
+    manager::sk_package_manager::SilkSongPackageManager,
+    util::context::Context,
 };
+
+use super::sk_reverse_dependency_handler::SilkSongReverseDependencyHandler;
 
 #[derive(Debug, Error)]
 pub enum SilkSongDependencyHandlerError {
@@ -14,10 +17,14 @@ pub enum SilkSongDependencyHandlerError {
     DependencyError(String),
     #[error("Dependency not found: {0}")]
     DependencyMissing(String),
+    #[error("Dependency is still required: {0}")]
+    DependencyStillRequired(String),
     #[error("Failed to parse version: {0}")]
     VersionParseError(String),
     #[error("Failed to install: {0}")]
     InstallError(String),
+    #[error("Failed to uninstall: {0}")]
+    UninstallError(String),
 }
 
 pub struct SilkSongDependencyHandler<'pm> {
@@ -49,6 +56,11 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
                 Err(e) => errors.push(e),
             }
         }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
         Ok(())
     }
 
@@ -61,7 +73,7 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
     ) -> Result<(), SilkSongDependencyHandlerError> {
         let package = ctx
             .index
-            .get_package_by_full_name(&dependency)
+            .get_package_by_full_name_with_version(&dependency)
             .ok_or_else(|| SilkSongDependencyHandlerError::DependencyMissing(dependency.clone()))?
             .clone();
 
@@ -106,6 +118,94 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
             .map_err(|e| {
                 SilkSongDependencyHandlerError::InstallError(format!(
                     "Failed to install {}: {:?}",
+                    package.package_full_name_with_version, e
+                ))
+            })?;
+
+        Ok(())
+    }
+
+    pub fn uninstall_dependencies<F: FnMut(UninstallEvent)>(
+        &self,
+        ctx: &mut Context,
+        dependencies: Vec<String>,
+        force: bool,
+        progress: &mut F,
+        profile_path: &PathBuf,
+    ) -> Result<Vec<String>, Vec<SilkSongDependencyHandlerError>> {
+        progress(UninstallEvent::UninstallingDependencies {
+            dependencies: dependencies.clone(),
+        });
+
+        let mut errors: Vec<SilkSongDependencyHandlerError> = Vec::new();
+        let mut still_required = Vec::new();
+        for dependency in dependencies {
+            if SilkSongReverseDependencyHandler::dependency_is_required(ctx, &dependency) && !force
+            {
+                still_required.push(dependency.clone());
+                continue;
+            }
+
+            match self.uninstall_single_dependency(ctx, dependency, progress, profile_path) {
+                Ok(_) => (),
+                Err(e) => errors.push(e),
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        Ok(still_required)
+    }
+
+    fn uninstall_single_dependency<F: FnMut(UninstallEvent)>(
+        &self,
+        ctx: &mut Context,
+        dependency: String,
+        progress: &mut F,
+        profile_path: &PathBuf,
+    ) -> Result<(), SilkSongDependencyHandlerError> {
+        let package = ctx
+            .index
+            .get_package_by_full_name_with_version(&dependency)
+            .ok_or_else(|| SilkSongDependencyHandlerError::DependencyMissing(dependency.clone()))?
+            .clone();
+
+        if ctx.tracker.get(&package.package_full_name).is_none() {
+            progress(UninstallEvent::DependencyAlreadyUninstalled {
+                name: dependency.clone(),
+            });
+            return Ok(());
+        }
+
+        let is_required = ctx.tracker.get_all().values().any(|installed_pkg| {
+            match ctx.index.get_package_by_full_name_with_version(
+                &installed_pkg.package_full_name_with_version,
+            ) {
+                Some(installed_package_info) => installed_package_info
+                    .dependencies
+                    .iter()
+                    .any(|dep| dep == &dependency),
+                None => false,
+            }
+        });
+
+        if is_required {
+            return Err(SilkSongDependencyHandlerError::DependencyStillRequired(
+                dependency.clone(),
+            ));
+        }
+
+        progress(UninstallEvent::UninstallingDependency {
+            name: dependency.clone(),
+        });
+
+        self.package_manager
+            .uninstall_package(ctx, &package, progress, profile_path)
+            .map_err(|e| {
+                SilkSongDependencyHandlerError::UninstallError(format!(
+                    "Failed to uninstall {}: {:?}",
                     package.package_full_name_with_version, e
                 ))
             })?;

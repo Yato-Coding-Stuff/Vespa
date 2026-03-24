@@ -45,6 +45,9 @@ pub enum SubArgs {
     Uninstall {
         #[arg(required = true)]
         packages: Vec<String>,
+
+        #[arg(long)]
+        force: bool,
     },
     List {
         #[arg(required = false)]

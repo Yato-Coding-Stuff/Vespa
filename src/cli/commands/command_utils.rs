@@ -10,7 +10,7 @@ pub fn input_handling(
     let mut optional_packages: Vec<Option<SilkSongFlattenedPackage>> = Vec::new();
 
     for package in packages {
-        if let Some(package) = ctx.index.get_package_by_full_name(&package) {
+        if let Some(package) = ctx.index.get_package_by_full_name_with_version(&package) {
             println!(
                 "==> Exact match found: {}",
                 package.package_full_name_with_version
@@ -58,7 +58,7 @@ pub fn input_handling(
 
             let selected_package = ctx
                 .index
-                .get_package_by_full_name(&matches[selection - 1].1.clone())
+                .get_package_by_full_name_with_version(&matches[selection - 1].1.clone())
                 .unwrap();
 
             optional_packages.push(Some(selected_package));

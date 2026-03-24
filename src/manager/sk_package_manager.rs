@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use crate::{
-    cli::presenter::events::install_event::InstallEvent,
+    cli::presenter::events::{install_event::InstallEvent, uninstall_event::UninstallEvent},
     manager::{
         downloader::sk_package_downloader::{
             SilkSongPackageDownloader, SilkSongPackageDownloaderError,
@@ -89,6 +89,29 @@ impl SilkSongPackageManager {
             .installer
             .install_bepinex(ctx, package, &zip_dir, bepinex_path)
         {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub fn uninstall_package<F: FnMut(UninstallEvent)>(
+        &self,
+        ctx: &mut crate::util::context::Context,
+        package: &SilkSongFlattenedPackage,
+        progress: &mut F,
+        profile_path: &PathBuf,
+    ) -> Result<(), SilkSongPackageManagerError> {
+        if ctx.black_list.contains(&package.package_full_name.as_str()) {
+            return Err(SilkSongPackageManagerError::PackageBlacklisted(
+                package.package_full_name_with_version.clone(),
+            ));
+        }
+
+        progress(UninstallEvent::UninstallingMod {
+            name: package.package_full_name_with_version.clone(),
+        });
+
+        match self.installer.uninstall_package(ctx, package, profile_path) {
             Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }
