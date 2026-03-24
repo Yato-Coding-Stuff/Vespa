@@ -33,6 +33,7 @@ pub(super) struct SilkSongVersion {
 // simplify tracker to use file-based source-of-truth
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SilkSongInstalledPackageRecord {
+    pub package_full_name_with_version: String,
     pub package_full_name: String,
     pub version_number: Option<String>,
     pub file_path: PathBuf,
@@ -109,8 +110,8 @@ impl SilkSongIndex {
         })
     }
 
-    pub fn get_package_by_full_name(&self, full_name: &str) -> Option<SilkSongFlattenedPackage> {
-        self.packages_by_full_name.get(full_name).cloned()
+    pub fn get_package_by_full_name_with_version(&self, full_name_with_version: &str) -> Option<SilkSongFlattenedPackage> {
+        self.packages_by_full_name.get(full_name_with_version).cloned()
     }
 
     pub fn get_latest_package_by_package_name(
