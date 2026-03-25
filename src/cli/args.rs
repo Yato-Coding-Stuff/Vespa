@@ -59,6 +59,12 @@ pub enum SubArgs {
             help = "Show available mods from the repository instead of installed ones"
         )]
         available: bool,
+
+        #[arg(
+            long,
+            help = "Show all package versions, instead of just the latest"
+        )]
+        all_versions: bool,
     },
     Show {
         #[arg(required = true)]
