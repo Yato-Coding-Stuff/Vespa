@@ -3,14 +3,10 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use crate::{
-    cli::presenter::events::{install_event::InstallEvent, uninstall_event::UninstallEvent},
+    cli::presenter::events::{InstallEvent, UninstallEvent},
     manager::{
-        downloader::sk_package_downloader::{
-            SilkSongPackageDownloader, SilkSongPackageDownloaderError,
-        },
-        installer::sk_package_installer::{
-            SilkSongPackageInstaller, SilkSongPackageInstallerError,
-        },
+        sk_package_downloader::{SilkSongPackageDownloader, SilkSongPackageDownloaderError},
+        sk_package_installer::{SilkSongPackageInstaller, SilkSongPackageInstallerError},
     },
     packages::SilkSongFlattenedPackage,
 };

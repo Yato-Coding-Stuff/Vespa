@@ -4,7 +4,7 @@ use reqwest::blocking::Client;
 use tempfile::TempDir;
 use thiserror::Error;
 
-use crate::cli::presenter::events::install_event::InstallEvent;
+use crate::cli::presenter::events::InstallEvent;
 
 #[derive(Debug, Error)]
 pub enum SilkSongPackageDownloaderError {

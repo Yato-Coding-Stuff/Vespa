@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::cli::commands::command_utils;
 use crate::{
-    cli::presenter::{events::install_event::InstallEvent, presenter::Presenter},
+    cli::presenter::{events::InstallEvent, presenter::Presenter},
     handlers::install_handler::{self, InstallResult},
     packages::SilkSongFlattenedPackage,
     util::context::Context,

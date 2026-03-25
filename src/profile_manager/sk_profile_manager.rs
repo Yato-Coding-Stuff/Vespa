@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::{
     cli::presenter::{
-        events::{install_event::InstallEvent, profile_manager_event::ProfileManagerEvent},
+        events::{InstallEvent, ProfileManagerEvent},
         presenter::Presenter,
     },
     manager::sk_package_manager::{SilkSongPackageManager, SilkSongPackageManagerError},

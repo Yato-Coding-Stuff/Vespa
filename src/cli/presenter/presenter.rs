@@ -1,6 +1,6 @@
 use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::cli::presenter::events::event::Event;
+use crate::cli::presenter::events::Event;
 
 pub struct Presenter {
     progress_bar: Option<ProgressBar>,
