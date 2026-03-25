@@ -47,7 +47,13 @@ pub fn install(
 ) {
     let mut presenter = |event| presenter.display(&event);
 
-    let packages = command_utils::input_handling(ctx, packages);
+    let packages = match command_utils::input_handling(ctx, packages) {
+        Ok(packages) => packages,
+        Err(e) => {
+            println!("{}", e);
+            return;
+        }
+    };
 
     let packages = packages
         .iter()
