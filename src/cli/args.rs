@@ -50,10 +50,14 @@ pub enum SubArgs {
         force: bool,
     },
     List {
+        /// Filter by package names (optional)
         #[arg(required = false)]
         packages: Vec<String>,
 
-        #[arg(long)]
+        #[arg(
+            long,
+            help = "Show available mods from the repository instead of installed ones"
+        )]
         available: bool,
     },
     Show {
