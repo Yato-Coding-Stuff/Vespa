@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
 use crate::{
-    cli::presenter::events::uninstall_event::UninstallEvent,
+    cli::presenter::events::UninstallEvent,
     manager::{
-        dependency_handler::sk_dependency_handler::{
+        sk_dependency_handler::{
             SilkSongDependencyHandler, SilkSongDependencyHandlerError,
+            SilkSongReverseDependencyHandler,
         },
-        dependency_handler::sk_reverse_dependency_handler::SilkSongReverseDependencyHandler,
         sk_package_manager::SilkSongPackageManagerError,
     },
     packages::SilkSongFlattenedPackage,

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use crate::{
-    cli::presenter::events::install_event::InstallEvent,
+    cli::presenter::events::InstallEvent,
     manager::{
-        dependency_handler::sk_dependency_handler::{
+        sk_dependency_handler::{
             SilkSongDependencyHandler, SilkSongDependencyHandlerError,
         },
         sk_package_manager::SilkSongPackageManagerError,

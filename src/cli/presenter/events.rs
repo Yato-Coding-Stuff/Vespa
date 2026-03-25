@@ -1,4 +1,8 @@
-use crate::cli::presenter::{events::event::Event, presenter::Presenter};
+use crate::cli::presenter::presenter::Presenter;
+
+pub trait Event {
+    fn render(&self, presenter: &mut Presenter);
+}
 
 pub enum InstallEvent {
     InstallingDependencies {
@@ -71,6 +75,69 @@ impl Event for InstallEvent {
                 println!("-> Installing mod {name}...")
             }
             InstallEvent::Finished => println!("==> Finished"),
+        }
+    }
+}
+
+pub enum UninstallEvent {
+    UninstallingMod { name: String },
+    UninstallingDependencies { dependencies: Vec<String> },
+    UninstallingDependency { name: String },
+    DependencyAlreadyUninstalled { name: String },
+    Finished,
+}
+
+impl Event for UninstallEvent {
+    fn render(&self, _presenter: &mut Presenter) {
+        match self {
+            UninstallEvent::UninstallingMod { name } => {
+                println!("==> Uninstalling mod {name}...");
+            }
+            UninstallEvent::UninstallingDependencies { dependencies } => {
+                println!("==> Uninstalling dependencies: {dependencies:?}");
+            }
+            UninstallEvent::UninstallingDependency { name } => {
+                println!("-> Uninstalling dependency {name}...");
+            }
+            UninstallEvent::DependencyAlreadyUninstalled { name } => {
+                println!("-> Dependency {name} is already uninstalled");
+                println!("-> Skipping...");
+            }
+            UninstallEvent::Finished => {
+                println!("==> Finished");
+            }
+        }
+    }
+}
+
+pub enum ProfileManagerEvent {
+    CreatingProfileDirectory {
+        name: String,
+        game: String,
+        path: String,
+    },
+    InstallingBepInEx {
+        name: String,
+        game: String,
+        path: String,
+    },
+}
+
+impl Event for ProfileManagerEvent {
+    fn render(&self, _presenter: &mut Presenter) {
+        match self {
+            ProfileManagerEvent::CreatingProfileDirectory { name, game, path } => {
+                println!(
+                    "==> Creating profile directory for profile {} ({}) at wouldnt you like to know where?",
+                    name, game
+                );
+            }
+            ProfileManagerEvent::InstallingBepInEx { name, game, path } => {
+                println!(
+                    "==> Installing BepInEx for profile {} ({}) at wouldnt you like to know where?",
+                    name, game
+                );
+            }
         }
     }
 }
