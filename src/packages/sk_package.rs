@@ -67,6 +67,7 @@ pub enum SilkSongIndexError {
 #[derive(Debug)]
 pub struct SilkSongIndex {
     pub packages_by_full_name: HashMap<String, SilkSongFlattenedPackage>,
+    pub all_versions_by_full_name: HashMap<String, Vec<SilkSongFlattenedPackage>>,
     pub latest_full_name_by_package_name: HashMap<String, String>,
 }
 
@@ -76,6 +77,8 @@ impl SilkSongIndex {
 
         let mut packages_by_full_name = HashMap::new();
         let mut latest_full_name_by_package_name = HashMap::new();
+        let mut all_versions_by_full_name: HashMap<String, Vec<SilkSongFlattenedPackage>> =
+            HashMap::new();
 
         let blacklist: HashSet<&str> = blacklist.iter().copied().collect();
 
@@ -96,6 +99,10 @@ impl SilkSongIndex {
                     dependencies: filtered_deps.collect(),
                 };
 
+                all_versions_by_full_name
+                    .entry(flattened.package_full_name.clone())
+                    .or_default()
+                    .push(flattened.clone());
                 packages_by_full_name.insert(ver.full_name.clone(), flattened.clone());
                 if i == 0 {
                     latest_full_name_by_package_name
@@ -107,11 +114,17 @@ impl SilkSongIndex {
         Ok(Self {
             packages_by_full_name,
             latest_full_name_by_package_name,
+            all_versions_by_full_name,
         })
     }
 
-    pub fn get_package_by_full_name_with_version(&self, full_name_with_version: &str) -> Option<SilkSongFlattenedPackage> {
-        self.packages_by_full_name.get(full_name_with_version).cloned()
+    pub fn get_package_by_full_name_with_version(
+        &self,
+        full_name_with_version: &str,
+    ) -> Option<SilkSongFlattenedPackage> {
+        self.packages_by_full_name
+            .get(full_name_with_version)
+            .cloned()
     }
 
     pub fn get_latest_package_by_package_name(
@@ -122,5 +135,12 @@ impl SilkSongIndex {
             .get(package_name)
             .and_then(|full_name| self.packages_by_full_name.get(full_name))
             .cloned()
+    }
+
+    pub fn get_versions_by_full_name(
+        &self,
+        full_name: &str,
+    ) -> Option<Vec<SilkSongFlattenedPackage>> {
+        self.all_versions_by_full_name.get(full_name).cloned()
     }
 }
