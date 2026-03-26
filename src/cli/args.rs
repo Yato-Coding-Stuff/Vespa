@@ -22,7 +22,7 @@ impl From<GameCli> for GameSwitcher {
 #[command(
     name = "vespa",
     version,
-    about = "A Cross-Platform Package Manager for the Hollow Knight Franchise"
+    about = "A Cross-Platform Mod-Installer for the Hollow Knight Franchise"
 )]
 pub struct Arg {
     /// Specify which game to target
