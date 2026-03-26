@@ -4,7 +4,7 @@ use tempfile::TempDir;
 use thiserror::Error;
 
 use crate::{
-    packages::SilkSongFlattenedPackage,
+    packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
     util::{
         context::Context,
         file_handler::{FileHandlerError, delete_dir, recursively_copy_dir, unzip_to_dir},

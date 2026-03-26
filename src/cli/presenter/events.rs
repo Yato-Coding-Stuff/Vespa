@@ -82,7 +82,6 @@ impl Event for InstallEvent {
 pub enum UninstallEvent {
     UninstallingMod { name: String },
     UninstallingDependencies { dependencies: Vec<String> },
-    UninstallingDependency { name: String },
     DependencyAlreadyUninstalled { name: String },
     Finished,
 }
@@ -96,15 +95,83 @@ impl Event for UninstallEvent {
             UninstallEvent::UninstallingDependencies { dependencies } => {
                 println!("==> Uninstalling dependencies: {dependencies:?}");
             }
-            UninstallEvent::UninstallingDependency { name } => {
-                println!("-> Uninstalling dependency {name}...");
-            }
             UninstallEvent::DependencyAlreadyUninstalled { name } => {
                 println!("-> Dependency {name} is already uninstalled");
                 println!("-> Skipping...");
             }
             UninstallEvent::Finished => {
                 println!("==> Finished");
+            }
+        }
+    }
+}
+
+pub enum UpdateEvent {
+    UpdateMod {
+        name: String,
+        old_version: String,
+        new_version: String,
+    },
+    CleaningUpOldMod {
+        name: String,
+    },
+    DownloadingMod {
+        name: String,
+    },
+    InstallingMod {
+        name: String,
+    },
+    UpdatingDependencies {
+        dependencies: Vec<String>,
+    },
+    DependencyAlreadyNewestVersion {
+        name: String,
+    },
+    UpdatingDependency {
+        name: String,
+        old_version: String,
+        new_version: String,
+    },
+    InstallingDependency {
+        name: String,
+    },
+}
+
+impl Event for UpdateEvent {
+    fn render(&self, _presenter: &mut Presenter) {
+        match self {
+            UpdateEvent::UpdateMod {
+                name,
+                old_version,
+                new_version,
+            } => {
+                println!("==> Updating mod {name} from {old_version} to {new_version}...");
+            }
+            UpdateEvent::CleaningUpOldMod { name } => {
+                println!("-> Cleaning up old mod {name}...");
+            }
+            UpdateEvent::DownloadingMod { name } => {
+                println!("-> Downloading mod {name}...");
+            }
+            UpdateEvent::InstallingMod { name } => {
+                println!("-> Installing mod {name}...")
+            }
+            UpdateEvent::UpdatingDependencies { dependencies } => {
+                println!("==> Updating dependencies: {dependencies:?}");
+            }
+            UpdateEvent::DependencyAlreadyNewestVersion { name } => {
+                println!("-> Dependency {name} is already the newest version");
+                println!("-> Skipping...");
+            }
+            UpdateEvent::UpdatingDependency {
+                name,
+                old_version,
+                new_version,
+            } => {
+                println!("-> Updating dependency {name} from {old_version} to {new_version}...");
+            }
+            UpdateEvent::InstallingDependency { name } => {
+                println!("-> Dependency {name} not installed. installing...")
             }
         }
     }

@@ -3,7 +3,9 @@ use clap::Parser;
 use crate::{
     cli::{
         args::{Arg, SubArgs},
-        commands::{install_command, list_command, show_command, uninstall_command},
+        commands::{
+            install_command, list_command, show_command, uninstall_command, update_command,
+        },
         presenter::presenter::Presenter,
     },
     profile_manager::sk_profile_manager::SilkSongProfileManager,
@@ -51,6 +53,9 @@ pub fn run(ctx: &mut Context) {
         }
         SubArgs::Show { package } => {
             show_command::show(ctx, package);
+        }
+        SubArgs::Update { packages } => {
+            update_command::update(ctx, &mut presenter, packages, &profile_path);
         }
         _ => {
             todo!()

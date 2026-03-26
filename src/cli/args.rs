@@ -49,6 +49,10 @@ pub enum SubArgs {
         #[arg(long)]
         force: bool,
     },
+    Update {
+        #[arg(required = false)]
+        packages: Vec<String>,
+    },
     List {
         /// Filter by package names (optional)
         #[arg(required = false)]
