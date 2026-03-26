@@ -4,7 +4,7 @@ use semver::Version;
 use thiserror::Error;
 
 use crate::{
-    cli::presenter::events::{InstallEvent, UninstallEvent},
+    cli::presenter::events::{InstallEvent, UninstallEvent, UpdateEvent},
     manager::sk_package_manager::SilkSongPackageManager,
     util::context::Context,
 };
@@ -195,15 +195,105 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
             ));
         }
 
-        progress(UninstallEvent::UninstallingDependency {
-            name: dependency.clone(),
-        });
-
         self.package_manager
             .uninstall_package(ctx, &package, progress, profile_path)
             .map_err(|e| {
                 SilkSongDependencyHandlerError::UninstallError(format!(
                     "Failed to uninstall {}: {:?}",
+                    package.package_full_name_with_version, e
+                ))
+            })?;
+
+        Ok(())
+    }
+
+    pub fn update_dependencies<F: FnMut(UpdateEvent)>(
+        &self,
+        ctx: &mut Context,
+        dependencies: Vec<String>,
+        progress: &mut F,
+        profile_path: &PathBuf,
+    ) -> Result<(), Vec<SilkSongDependencyHandlerError>> {
+        progress(UpdateEvent::UpdatingDependencies {
+            dependencies: dependencies.clone(),
+        });
+
+        let mut errors: Vec<SilkSongDependencyHandlerError> = Vec::new();
+
+        for dependency in dependencies {
+            if let Err(e) =
+                self.update_single_dependency(ctx, dependency.clone(), progress, profile_path)
+            {
+                errors.push(e);
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn update_single_dependency<F: FnMut(UpdateEvent)>(
+        &self,
+        ctx: &mut Context,
+        dependency: String,
+        progress: &mut F,
+        profile_path: &PathBuf,
+    ) -> Result<(), SilkSongDependencyHandlerError> {
+        // Look up package in index
+        let package = ctx
+            .index
+            .get_package_by_full_name_with_version(&dependency)
+            .ok_or_else(|| SilkSongDependencyHandlerError::DependencyMissing(dependency.clone()))?
+            .clone();
+
+        let package_newest_version = ctx
+            .index
+            .get_latest_package_by_package_name(&package.package_full_name)
+            .ok_or_else(|| SilkSongDependencyHandlerError::DependencyMissing(dependency.clone()))?
+            .clone();
+
+        // Parse required version
+        let required_version =
+            Version::parse(&package_newest_version.version_number).map_err(|_| {
+                SilkSongDependencyHandlerError::VersionParseError(package.version_number.clone())
+            })?;
+
+        // Check installed version
+        if let Some(installed) = ctx.tracker.get(&package.package_full_name) {
+            let installed_version = installed
+                .version_number
+                .as_deref()
+                .unwrap_or("0.0.0")
+                .parse::<semver::Version>()
+                .unwrap_or_else(|_| semver::Version::new(0, 0, 0));
+
+            if installed_version >= required_version {
+                progress(UpdateEvent::DependencyAlreadyNewestVersion {
+                    name: package.package_full_name.clone(),
+                });
+                return Ok(());
+            } else {
+                progress(UpdateEvent::UpdatingDependency {
+                    name: package.package_full_name.clone(),
+                    old_version: installed_version.to_string(),
+                    new_version: package.version_number.clone(),
+                });
+            }
+        } else {
+            progress(UpdateEvent::InstallingDependency {
+                name: package.package_full_name.clone(),
+            });
+        }
+
+        // Install or upgrade dependency
+        self.package_manager
+            .update_package(ctx, &package_newest_version, progress, profile_path)
+            .map_err(|e| {
+                SilkSongDependencyHandlerError::InstallError(format!(
+                    "Failed to install/update {}: {:?}",
                     package.package_full_name_with_version, e
                 ))
             })?;
