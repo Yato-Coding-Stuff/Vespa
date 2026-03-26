@@ -22,14 +22,13 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new() -> Result<Self, ContextError> {
         let config = Config::load()?;
 
         let tracker = SilkSongPackageTracker::new();
+        let index = SilkSongIndex::new();
 
         let black_list = vec!["BepInEx-BepInExPack_Silksong"];
-
-        let index = SilkSongIndex::new(&black_list)?;
 
         Ok(Self {
             config,

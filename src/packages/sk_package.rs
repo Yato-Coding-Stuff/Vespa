@@ -72,7 +72,15 @@ pub struct SilkSongIndex {
 }
 
 impl SilkSongIndex {
-    pub fn new(blacklist: &[&str]) -> Result<Self, SilkSongIndexError> {
+    pub fn new() -> Self {
+        SilkSongIndex {
+            packages_by_full_name: HashMap::new(),
+            all_versions_by_full_name: HashMap::new(),
+            latest_full_name_by_package_name: HashMap::new(),
+        }
+    }
+
+    pub fn initialize(&mut self, blacklist: &[&str]) -> Result<(), SilkSongIndexError> {
         let packages = SilkSongPackageFetcher::fetch()?;
 
         let mut packages_by_full_name = HashMap::new();
@@ -111,11 +119,10 @@ impl SilkSongIndex {
             }
         }
 
-        Ok(Self {
-            packages_by_full_name,
-            latest_full_name_by_package_name,
-            all_versions_by_full_name,
-        })
+        self.packages_by_full_name = packages_by_full_name;
+        self.latest_full_name_by_package_name = latest_full_name_by_package_name;
+        self.all_versions_by_full_name = all_versions_by_full_name;
+        Ok(())
     }
 
     pub fn get_package_by_full_name_with_version(

@@ -47,6 +47,14 @@ pub fn install(
 ) {
     let mut presenter = |event| presenter.display(&event);
 
+    match ctx.index.initialize(&ctx.black_list) {
+        Ok(_) => (),
+        Err(e) => {
+            println!("==> {}", e);
+            return;
+        }
+    }
+
     let packages = match command_utils::input_handling(ctx, packages) {
         Ok(packages) => packages,
         Err(e) => {
