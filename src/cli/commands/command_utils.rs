@@ -23,13 +23,14 @@ pub fn input_handling(
         } else {
             let matcher = SkimMatcherV2::default();
 
+            let package = package.to_lowercase();
             let mut matches = ctx
                 .index
                 .latest_full_name_by_package_name
                 .iter()
                 .filter_map(|(name, pkg)| {
                     matcher
-                        .fuzzy_match(name, &package)
+                        .fuzzy_match(&name.to_lowercase(), &package)
                         .filter(|score| *score > 100)
                         .map(|score| (name, pkg, score))
                 })
