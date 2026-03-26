@@ -2,6 +2,14 @@ use crate::util::context::Context;
 
 pub fn list(ctx: &mut Context, packages: Vec<String>, available: bool, all_versions: bool) {
     if available {
+        match ctx.index.initialize(&ctx.black_list) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("==> {}", e);
+                return;
+            }
+        }
+
         list_available(ctx, packages, all_versions);
     } else {
         list_installed(ctx, packages);
