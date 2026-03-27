@@ -4,7 +4,8 @@ use crate::{
     cli::{
         args::{Arg, SubArgs},
         commands::{
-            install_command, list_command, show_command, uninstall_command, update_command,
+            install_command, install_local_command, list_command, show_command, uninstall_command,
+            update_command,
         },
         presenter::presenter::Presenter,
     },
@@ -40,6 +41,9 @@ pub fn run(ctx: &mut Context) {
     match args.sub {
         SubArgs::Install { packages } => {
             install_command::install(ctx, &mut presenter, packages, &profile_path);
+        }
+        SubArgs::InstallLocal { package_paths } => {
+            install_local_command::install(ctx, package_paths, &profile_path);
         }
         SubArgs::Uninstall { packages, force } => {
             uninstall_command::uninstall(ctx, &mut presenter, packages, force, &profile_path);

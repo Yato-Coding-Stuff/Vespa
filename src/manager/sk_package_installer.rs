@@ -1,6 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
-use tempfile::TempDir;
+use tempfile::{TempDir, tempdir};
 use thiserror::Error;
 
 use crate::{
@@ -53,11 +56,37 @@ impl SilkSongPackageInstaller {
         Ok(())
     }
 
+    pub fn install_local_package(
+        &self,
+        dir: &PathBuf,
+        profile_path: &PathBuf,
+    ) -> Result<(), SilkSongPackageInstallerError> {
+        let zip_path = dir;
+
+        let temp_dir = TempDir::new().map_err(FileHandlerError::CreateZipDirError)?;
+
+        let unzip_dir = temp_dir.path().join("unzipped");
+
+        std::fs::create_dir_all(&unzip_dir).map_err(FileHandlerError::CreateZipDirError)?;
+
+        unzip_to_dir(zip_path, &unzip_dir)?;
+
+        let package_name = zip_path.file_stem().unwrap().to_string_lossy().to_string();
+
+        let mod_path = profile_path
+            .join("BepInEx")
+            .join("plugins")
+            .join(package_name);
+
+        recursively_copy_dir(&unzip_dir, &mod_path)?;
+
+        Ok(())
+    }
+
     pub fn uninstall_package(
         &self,
         ctx: &mut Context,
-        package: &SilkSongFlattenedPackage,
-        profile_path: &PathBuf,
+        package: &SilkSongInstalledPackageRecord,
     ) -> Result<(), SilkSongPackageInstallerError> {
         let installed_package = match ctx.tracker.get(&package.package_full_name) {
             Some(p) => p,

@@ -5,7 +5,7 @@ use dialoguer::Confirm;
 use crate::{
     cli::{commands::command_utils, presenter::presenter::Presenter},
     handlers::uninstall_handler::{self, UninstallResult},
-    packages::SilkSongFlattenedPackage,
+    packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
     util::context::Context,
 };
 
@@ -26,7 +26,7 @@ pub fn uninstall(
         }
     }
 
-    let packages = match command_utils::input_handling(ctx, packages) {
+    let packages = match command_utils::uninstall_input_handling(ctx, packages) {
         Ok(packages) => packages,
         Err(e) => {
             println!("{}", e);
@@ -37,7 +37,7 @@ pub fn uninstall(
     let packages = packages
         .iter()
         .filter_map(|p| p.as_ref())
-        .collect::<Vec<&SilkSongFlattenedPackage>>();
+        .collect::<Vec<&SilkSongInstalledPackageRecord>>();
 
     if !Confirm::new()
         .with_prompt(format!(

@@ -24,7 +24,7 @@ pub fn update(
     }
 
     if !packages.is_empty() {
-        let packages = match command_utils::input_handling(ctx, packages) {
+        let packages = match command_utils::install_input_handling(ctx, packages) {
             Ok(packages) => packages,
             Err(e) => {
                 println!("{}", e);

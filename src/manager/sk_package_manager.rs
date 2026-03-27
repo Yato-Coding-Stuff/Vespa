@@ -98,7 +98,7 @@ impl SilkSongPackageManager {
     pub fn uninstall_package<F: FnMut(UninstallEvent)>(
         &self,
         ctx: &mut crate::util::context::Context,
-        package: &SilkSongFlattenedPackage,
+        package: &SilkSongInstalledPackageRecord,
         progress: &mut F,
         profile_path: &PathBuf,
     ) -> Result<(), SilkSongPackageManagerError> {
@@ -112,7 +112,7 @@ impl SilkSongPackageManager {
             name: package.package_full_name_with_version.clone(),
         });
 
-        match self.installer.uninstall_package(ctx, package, profile_path) {
+        match self.installer.uninstall_package(ctx, package) {
             Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }

@@ -9,7 +9,7 @@ use crate::{
         },
         sk_package_manager::SilkSongPackageManagerError,
     },
-    packages::SilkSongFlattenedPackage,
+    packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
 };
 use thiserror::Error;
 
@@ -32,17 +32,13 @@ pub enum UninstallError {
 
 pub fn run<F: FnMut(UninstallEvent)>(
     ctx: &mut Context,
-    package: &SilkSongFlattenedPackage,
+    package: &SilkSongInstalledPackageRecord,
     force: bool,
     progress: &mut F,
     profile_path: &PathBuf,
 ) -> Result<UninstallResult, UninstallError> {
     let pm = SilkSongPackageManager::new();
     let deps = SilkSongDependencyHandler::new(&pm);
-
-    if ctx.tracker.get(&package.package_full_name).is_none() {
-        return Ok(UninstallResult::NotInstalled);
-    }
 
     if SilkSongReverseDependencyHandler::package_is_required(ctx, &package.package_full_name)
         && !force
@@ -52,18 +48,22 @@ pub fn run<F: FnMut(UninstallEvent)>(
 
     pm.uninstall_package(ctx, package, progress, profile_path)?;
 
-    let still_required = deps
-        .uninstall_dependencies(
-            ctx,
-            package.dependencies.clone(),
-            force,
-            progress,
-            profile_path,
-        )
-        .map_err(UninstallError::DependencyErrors)?;
+    let dep: Option<Vec<String>> = ctx
+        .index
+        .get_package_by_full_name_with_version(&package.package_full_name_with_version)
+        .map(|p| p.dependencies);
 
-    if !still_required.is_empty() {
-        return Ok(UninstallResult::PackageStillRequired);
+    match dep {
+        Some(dep) => {
+            let still_required = deps
+                .uninstall_dependencies(ctx, dep, force, progress, profile_path)
+                .map_err(UninstallError::DependencyErrors)?;
+
+            if !still_required.is_empty() {
+                return Ok(UninstallResult::PackageStillRequired);
+            }
+        }
+        None => {}
     }
 
     Ok(UninstallResult::Uninstalled)

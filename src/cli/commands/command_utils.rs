@@ -1,9 +1,12 @@
 use dialoguer::Input;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 
-use crate::{packages::SilkSongFlattenedPackage, util::context::Context};
+use crate::{
+    packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
+    util::context::Context,
+};
 
-pub fn input_handling(
+pub fn install_input_handling(
     ctx: &mut Context,
     packages: Vec<String>,
 ) -> Result<Vec<Option<SilkSongFlattenedPackage>>, String> {
@@ -84,6 +87,83 @@ pub fn input_handling(
                 .unwrap();
 
             optional_packages.push(Some(selected_package));
+        }
+    }
+    if optional_packages.iter().all(|p| p.is_none()) {
+        return Err("==> No matches found".to_string());
+    }
+
+    Ok(optional_packages)
+}
+
+pub fn uninstall_input_handling(
+    ctx: &mut Context,
+    packages: Vec<String>,
+) -> Result<Vec<Option<SilkSongInstalledPackageRecord>>, String> {
+    let mut optional_packages: Vec<Option<SilkSongInstalledPackageRecord>> = Vec::new();
+    for package in packages {
+        if let Some(package) = ctx.tracker.get(&package) {
+            println!(
+                "==> Exact match found: {}",
+                package.package_full_name_with_version
+            );
+            optional_packages.push(Some(package.clone()));
+        } else {
+            let matcher = SkimMatcherV2::default();
+
+            let package = package.to_lowercase();
+            let all_records = ctx.tracker.get_all();
+            let mut matches = all_records
+                .iter()
+                .filter_map(|(name, pkg)| {
+                    matcher
+                        .fuzzy_match(&name.to_lowercase(), &package)
+                        .filter(|score| *score > 100)
+                        .map(|score| (name, pkg, score))
+                })
+                .collect::<Vec<_>>();
+
+            matches.sort_by(|a, b| b.2.cmp(&a.2));
+
+            if matches.is_empty() {
+                println!("==> No matches found for: {}", package);
+                optional_packages.push(None);
+                continue;
+            }
+
+            if matches.len() == 1 {
+                optional_packages.push(Some(matches[0].1.clone()));
+                continue;
+            }
+
+            let matches: Vec<_> = matches.iter().take(3).cloned().collect();
+
+            println!("Multiple matches found:");
+            for (i, (name, _, _)) in matches.iter().enumerate() {
+                println!("{}) {}", i + 1, name);
+            }
+            println!("{}) None", matches.len() + 1);
+
+            let selection: usize = Input::new()
+                .with_prompt("==> Select a package by number")
+                .validate_with(|input: &usize| -> Result<(), String> {
+                    if *input == 0 || *input > matches.len() + 1 {
+                        Err("==> Invalid selection".to_string())
+                    } else {
+                        Ok(())
+                    }
+                })
+                .interact()
+                .unwrap();
+
+            if selection == matches.len() + 1 {
+                optional_packages.push(None);
+                continue;
+            }
+
+            let selected_package = ctx.tracker.get(&matches[selection - 1].0.clone()).unwrap();
+
+            optional_packages.push(Some(selected_package.clone()));
         }
     }
     if optional_packages.iter().all(|p| p.is_none()) {
