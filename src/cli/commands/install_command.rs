@@ -55,7 +55,7 @@ pub fn install(
         }
     }
 
-    let packages = match command_utils::input_handling(ctx, packages) {
+    let packages = match command_utils::install_input_handling(ctx, packages) {
         Ok(packages) => packages,
         Err(e) => {
             println!("{}", e);

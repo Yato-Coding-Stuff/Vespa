@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::util::config::GameSwitcher;
@@ -42,6 +44,10 @@ pub enum SubArgs {
         #[arg(required = true)]
         packages: Vec<String>,
     },
+    InstallLocal {
+        #[arg(required = true)]
+        package_paths: Vec<PathBuf>,
+    },
     Uninstall {
         #[arg(required = true)]
         packages: Vec<String>,
@@ -64,10 +70,7 @@ pub enum SubArgs {
         )]
         available: bool,
 
-        #[arg(
-            long,
-            help = "Show all package versions, instead of just the latest"
-        )]
+        #[arg(long, help = "Show all package versions, instead of just the latest")]
         all_versions: bool,
     },
     Show {

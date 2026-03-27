@@ -170,12 +170,15 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
             .ok_or_else(|| SilkSongDependencyHandlerError::DependencyMissing(dependency.clone()))?
             .clone();
 
-        if ctx.tracker.get(&package.package_full_name).is_none() {
-            progress(UninstallEvent::DependencyAlreadyUninstalled {
-                name: dependency.clone(),
-            });
-            return Ok(());
-        }
+        let installed_pkg = match ctx.tracker.get(&package.package_full_name) {
+            Some(installed_pkg) => installed_pkg.clone(),
+            None => {
+                progress(UninstallEvent::DependencyAlreadyUninstalled {
+                    name: dependency.clone(),
+                });
+                return Ok(());
+            }
+        };
 
         let is_required = ctx.tracker.get_all().values().any(|installed_pkg| {
             match ctx.index.get_package_by_full_name_with_version(
@@ -196,7 +199,7 @@ impl<'pm> SilkSongDependencyHandler<'pm> {
         }
 
         self.package_manager
-            .uninstall_package(ctx, &package, progress, profile_path)
+            .uninstall_package(ctx, &installed_pkg, progress, profile_path)
             .map_err(|e| {
                 SilkSongDependencyHandlerError::UninstallError(format!(
                     "Failed to uninstall {}: {:?}",
