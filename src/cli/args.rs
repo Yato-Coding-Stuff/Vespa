@@ -59,6 +59,14 @@ pub enum SubArgs {
         #[arg(required = false)]
         packages: Vec<String>,
     },
+    Disable {
+        #[arg(required = true)]
+        packages: Vec<String>,
+    },
+    Enable {
+        #[arg(required = true)]
+        packages: Vec<String>,
+    },
     List {
         /// Filter by package names (optional)
         #[arg(required = false)]

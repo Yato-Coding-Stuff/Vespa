@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use crate::{
-    cli::presenter::events::{InstallEvent, UninstallEvent, UpdateEvent},
+    cli::presenter::events::{DisableEnableEvent, InstallEvent, UninstallEvent, UpdateEvent},
     manager::{
         sk_package_downloader::{SilkSongPackageDownloader, SilkSongPackageDownloaderError},
         sk_package_installer::{SilkSongPackageInstaller, SilkSongPackageInstallerError},
     },
     packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
-    util::file_handler::delete_dir,
+    util::{context::Context, file_handler::delete_dir},
 };
 
 #[derive(Debug, Error)]
@@ -153,6 +153,30 @@ impl SilkSongPackageManager {
         self.installer
             .install_package(ctx, package, &zip_dir, profile_path)?;
 
+        Ok(())
+    }
+
+    pub fn disable_package<F: FnMut(DisableEnableEvent)>(
+        &self,
+        progress: &mut F,
+        package: &SilkSongInstalledPackageRecord,
+    ) -> Result<(), SilkSongPackageManagerError> {
+        progress(DisableEnableEvent::DisablingMod {
+            name: package.package_full_name_with_version.clone(),
+        });
+        self.installer.disable_package(progress, package)?;
+        Ok(())
+    }
+
+    pub fn enable_package<F: FnMut(DisableEnableEvent)>(
+        &self,
+        progress: &mut F,
+        package: &SilkSongInstalledPackageRecord,
+    ) -> Result<(), SilkSongPackageManagerError> {
+        progress(DisableEnableEvent::EnablingMod {
+            name: package.package_full_name_with_version.clone(),
+        });
+        self.installer.enable_package(progress, package)?;
         Ok(())
     }
 }

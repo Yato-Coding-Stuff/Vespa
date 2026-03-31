@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    fs::{self, read_dir, rename},
     path::{Path, PathBuf},
 };
 
@@ -7,6 +7,7 @@ use tempfile::{TempDir, tempdir};
 use thiserror::Error;
 
 use crate::{
+    cli::presenter::events::DisableEnableEvent,
     packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
     util::{
         context::Context,
@@ -24,6 +25,8 @@ pub enum SilkSongPackageInstallerError {
     FileHandlingError(#[from] FileHandlerError),
     #[error(transparent)]
     VersionParsingError(#[from] semver::Error),
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
 }
 
 pub struct SilkSongPackageInstaller;
@@ -117,6 +120,66 @@ impl SilkSongPackageInstaller {
         recursively_copy_dir(&bepinexpack_path, bepinex_path)?;
 
         ctx.tracker.add(package, &bepinex_path);
+
+        Ok(())
+    }
+
+    pub fn disable_package<F: FnMut(DisableEnableEvent)>(
+        &self,
+        progress: &mut F,
+        package: &SilkSongInstalledPackageRecord,
+    ) -> Result<(), SilkSongPackageInstallerError> {
+        let entry = read_dir(&package.file_path)
+            .map_err(SilkSongPackageInstallerError::IOError)?
+            .flatten()
+            .find_map(|e| {
+                let path = e.path();
+                let name = path.file_name()?.to_str()?;
+
+                let stem = name.strip_suffix(".dll")?;
+                Some((path.clone(), stem.to_string()))
+            });
+
+        let Some((path, stem)) = entry else {
+            progress(DisableEnableEvent::ModAlreadyDisabled {
+                name: package.package_full_name.clone(),
+            });
+            return Ok(());
+        };
+
+        let new_path = path.with_file_name(format!("{stem}.dll.disabled"));
+
+        rename(&path, &new_path).map_err(SilkSongPackageInstallerError::IOError)?;
+
+        Ok(())
+    }
+
+    pub fn enable_package<F: FnMut(DisableEnableEvent)>(
+        &self,
+        progress: &mut F,
+        package: &SilkSongInstalledPackageRecord,
+    ) -> Result<(), SilkSongPackageInstallerError> {
+        let entry = read_dir(&package.file_path)
+            .map_err(SilkSongPackageInstallerError::IOError)?
+            .flatten()
+            .find_map(|e| {
+                let path = e.path();
+                let name = path.file_name()?.to_str()?;
+
+                let stem = name.strip_suffix(".dll.disabled")?;
+                Some((path.clone(), stem.to_string()))
+            });
+
+        let Some((path, stem)) = entry else {
+            progress(DisableEnableEvent::ModAlreadyEnabled {
+                name: package.package_full_name.clone(),
+            });
+            return Ok(());
+        };
+
+        let new_path = path.with_file_name(format!("{stem}.dll"));
+
+        rename(&path, &new_path).map_err(SilkSongPackageInstallerError::IOError)?;
 
         Ok(())
     }
