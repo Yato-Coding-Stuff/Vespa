@@ -6,7 +6,7 @@ use crate::{
     util::context::Context,
 };
 
-pub fn install_input_handling(
+pub fn get_input_in_index(
     ctx: &mut Context,
     packages: Vec<String>,
 ) -> Result<Vec<Option<SilkSongFlattenedPackage>>, String> {
@@ -96,7 +96,7 @@ pub fn install_input_handling(
     Ok(optional_packages)
 }
 
-pub fn uninstall_input_handling(
+pub fn get_input_in_tracker(
     ctx: &mut Context,
     packages: Vec<String>,
 ) -> Result<Vec<Option<SilkSongInstalledPackageRecord>>, String> {

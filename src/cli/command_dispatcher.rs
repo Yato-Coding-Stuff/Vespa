@@ -4,8 +4,8 @@ use crate::{
     cli::{
         args::{Arg, SubArgs},
         commands::{
-            install_command, install_local_command, list_command, show_command, uninstall_command,
-            update_command,
+            disable_enable_command, install_command, install_local_command, list_command,
+            show_command, uninstall_command, update_command,
         },
         presenter::presenter::Presenter,
     },
@@ -47,6 +47,12 @@ pub fn run(ctx: &mut Context) {
         }
         SubArgs::Uninstall { packages, force } => {
             uninstall_command::uninstall(ctx, &mut presenter, packages, force, &profile_path);
+        }
+        SubArgs::Disable { packages } => {
+            disable_enable_command::disable(ctx, &mut presenter, packages);
+        }
+        SubArgs::Enable { packages } => {
+            disable_enable_command::enable(ctx, &mut presenter, packages);
         }
         SubArgs::List {
             packages,

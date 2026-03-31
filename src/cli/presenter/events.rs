@@ -208,3 +208,31 @@ impl Event for ProfileManagerEvent {
         }
     }
 }
+
+pub enum DisableEnableEvent {
+    DisablingMod { name: String },
+    ModAlreadyDisabled { name: String },
+    EnablingMod { name: String },
+    ModAlreadyEnabled { name: String },
+}
+
+impl Event for DisableEnableEvent {
+    fn render(&self, _presenter: &mut Presenter) {
+        match self {
+            DisableEnableEvent::DisablingMod { name } => {
+                println!("==> Disabling mod {name}...");
+            }
+            DisableEnableEvent::ModAlreadyDisabled { name } => {
+                println!("-> Mod {name} is already disabled");
+                println!("-> Skipping...");
+            }
+            DisableEnableEvent::EnablingMod { name } => {
+                println!("==> Enabling mod {name}...");
+            }
+            DisableEnableEvent::ModAlreadyEnabled { name } => {
+                println!("-> Mod {name} is already enabled");
+                println!("-> Skipping...");
+            }
+        }
+    }
+}

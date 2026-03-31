@@ -26,7 +26,7 @@ pub fn uninstall(
         }
     }
 
-    let packages = match command_utils::uninstall_input_handling(ctx, packages) {
+    let packages = match command_utils::get_input_in_tracker(ctx, packages) {
         Ok(packages) => packages,
         Err(e) => {
             println!("{}", e);

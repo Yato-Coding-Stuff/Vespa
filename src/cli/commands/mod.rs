@@ -1,4 +1,5 @@
 pub mod command_utils;
+pub mod disable_enable_command;
 pub mod install_command;
 pub mod install_local_command;
 pub mod list_command;
