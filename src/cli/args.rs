@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -30,9 +30,6 @@ pub struct Arg {
     /// Specify which game to target
     #[arg(long, global = true, value_enum)]
     pub game: Option<GameCli>,
-
-    #[arg(long, global = true)]
-    pub profile: Option<String>,
 
     #[command(subcommand)]
     pub sub: SubArgs,
@@ -84,5 +81,27 @@ pub enum SubArgs {
     Show {
         #[arg(required = true)]
         package: String,
+    },
+
+    Profile {
+        #[command(subcommand)]
+        args: ProfileArgs,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProfileArgs {
+    List,
+    Create {
+        #[arg(required = true)]
+        profile: String,
+    },
+    Delete {
+        #[arg(required = true)]
+        profile: String,
+    },
+    SetDefault {
+        #[arg(required = true)]
+        profile: String,
     },
 }

@@ -183,10 +183,29 @@ pub enum ProfileManagerEvent {
         game: String,
         path: String,
     },
+    ProfileDirectoryAlreadyExists {
+        name: String,
+        game: String,
+        path: String,
+    },
     InstallingBepInEx {
         name: String,
         game: String,
         path: String,
+    },
+    DeletingProfileDirectory {
+        name: String,
+        game: String,
+        path: String,
+    },
+    ProfileDirectoryDoesNotExist {
+        name: String,
+        game: String,
+        path: String,
+    },
+    SettingProfileAsDefault {
+        name: String,
+        game: String,
     },
 }
 
@@ -195,15 +214,36 @@ impl Event for ProfileManagerEvent {
         match self {
             ProfileManagerEvent::CreatingProfileDirectory { name, game, path } => {
                 println!(
-                    "==> Creating profile directory for profile {} ({}) at wouldnt you like to know where?",
-                    name, game
+                    "==> Creating profile directory for profile {} ({}) at {}",
+                    name, game, path
+                );
+            }
+            ProfileManagerEvent::ProfileDirectoryAlreadyExists { name, game, path } => {
+                println!(
+                    "==> Profile directory for profile {} ({}) already exists at {}",
+                    name, game, path
                 );
             }
             ProfileManagerEvent::InstallingBepInEx { name, game, path } => {
                 println!(
-                    "==> Installing BepInEx for profile {} ({}) at wouldnt you like to know where?",
-                    name, game
+                    "==> Installing BepInEx for profile {} ({}) at {}",
+                    name, game, path
                 );
+            }
+            ProfileManagerEvent::DeletingProfileDirectory { name, game, path } => {
+                println!(
+                    "==> Deleting profile directory for profile {} ({}) at {}",
+                    name, game, path
+                );
+            }
+            ProfileManagerEvent::ProfileDirectoryDoesNotExist { name, game, path } => {
+                println!(
+                    "==> Profile directory for profile {} ({}) does not exist at {}",
+                    name, game, path
+                );
+            }
+            ProfileManagerEvent::SettingProfileAsDefault { name, game } => {
+                println!("==> Setting profile {} ({}) as default", name, game);
             }
         }
     }

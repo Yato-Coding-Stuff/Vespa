@@ -74,15 +74,14 @@ pub fn run(
 
     pm.update_package(ctx, package, update_progress, profile_path)?;
     if !bulk_update {
-    dependency_manager
-        .update_dependencies(
-            ctx,
-            package.dependencies.clone(),
-            update_progress,
-            profile_path,
-        )
-        .map_err(UpdateError::DependencyErrors)?;
-
+        dependency_manager
+            .update_dependencies(
+                ctx,
+                package.dependencies.clone(),
+                update_progress,
+                profile_path,
+            )
+            .map_err(UpdateError::DependencyErrors)?;
     }
 
     Ok(UpdateResult::Updated)

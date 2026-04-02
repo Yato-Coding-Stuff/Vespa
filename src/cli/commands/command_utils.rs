@@ -1,9 +1,11 @@
+use std::path::PathBuf;
+
 use dialoguer::Input;
 use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 
 use crate::{
     packages::{SilkSongFlattenedPackage, SilkSongInstalledPackageRecord},
-    util::context::Context,
+    util::{config::GameSwitcher, context::Context},
 };
 
 pub fn get_input_in_index(
@@ -171,4 +173,15 @@ pub fn get_input_in_tracker(
     }
 
     Ok(optional_packages)
+}
+
+pub fn resolve_profile_path(ctx: &Context, game: &GameSwitcher) -> Option<PathBuf> {
+    ctx.config.get_default_profile(game).map(PathBuf::from)
+}
+
+pub fn require_profile_path(ctx: &Context, game: &GameSwitcher) -> Result<PathBuf, String> {
+    resolve_profile_path(ctx, game).ok_or_else(|| {
+        "No default profile set. Run `vespa profile set-default <name>` or create one first."
+            .to_string()
+    })
 }
