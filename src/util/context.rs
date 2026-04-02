@@ -3,13 +3,13 @@ use thiserror::Error;
 use crate::{
     packages::{SilkSongIndex, SilkSongIndexError},
     tracker::sk_package_tracker::SilkSongPackageTracker,
-    util::config::Config,
+    util::config::{Config, ConfigError},
 };
 
 #[derive(Debug, Error)]
 pub enum ContextError {
     #[error("config error: {0}")]
-    ConfigError(#[from] Box<dyn std::error::Error>),
+    ConfigError(#[from] ConfigError),
     #[error("index error: {0}")]
     IndexError(#[from] SilkSongIndexError),
 }
