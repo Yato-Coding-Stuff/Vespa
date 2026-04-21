@@ -64,12 +64,25 @@ pub fn run(ctx: &Context, game: &GameSwitcher, profile_path: &Path) {
 
     match command.spawn() {
         Ok(child) => {
-            println!("==> Launched {} (pid: {})", run_ctx.game, child.id());
+            println!(
+                "==> Launched {} with profile {} (pid: {})",
+                run_ctx.game,
+                profile_display_name(&run_ctx.profile_path),
+                child.id()
+            );
         }
         Err(error) => {
             eprintln!("Failed to launch {}: {}", run_ctx.game, error);
         }
     }
+}
+
+fn profile_display_name(profile_path: &Path) -> String {
+    profile_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_owned)
+        .unwrap_or_else(|| profile_path.display().to_string())
 }
 
 fn validate_run_context(run_ctx: &RunCommandContext) -> Result<(), String> {
@@ -210,10 +223,10 @@ fn current_os() -> OperatingSystem {
 mod tests {
     use super::{
         OperatingSystem, RunCommandContext, build_launch_plan, doorstop_target_assembly,
-        linux_profile_launcher, resolve_linux_game_executable,
+        linux_profile_launcher, profile_display_name, resolve_linux_game_executable,
     };
     use crate::util::config::GameSwitcher;
-    use std::fs;
+    use std::{fs, path::Path};
     use tempfile::tempdir;
 
     #[test]
@@ -224,6 +237,14 @@ mod tests {
         let launcher = linux_profile_launcher(&profile_dir);
 
         assert_eq!(launcher, profile_dir.join("run_bepinex.sh"));
+    }
+
+    #[test]
+    fn profile_display_name_uses_last_path_component() {
+        assert_eq!(
+            profile_display_name(Path::new("/profiles/silksong/default")),
+            "default"
+        );
     }
 
     #[test]
