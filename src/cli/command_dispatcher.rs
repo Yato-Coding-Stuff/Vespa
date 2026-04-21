@@ -6,7 +6,8 @@ use crate::{
         args::{Arg, ProfileArgs, SubArgs},
         commands::{
             command_utils, disable_enable_command, install_command, install_local_command,
-            list_command, profile_command, show_command, uninstall_command, update_command,
+            list_command, profile_command, run_command, show_command, uninstall_command,
+            update_command,
         },
         presenter::presenter::Presenter,
     },
@@ -61,6 +62,10 @@ pub fn run(ctx: &mut Context) {
         }
         SubArgs::Show { package } => {
             show_command::show(ctx, package);
+        }
+        SubArgs::Run {} => {
+            let profile_path = require_profile_path_or_exit(ctx, &game);
+            run_command::run(ctx, &game, &profile_path);
         }
         SubArgs::Update { packages } => {
             let profile_path = require_profile_path_or_exit(ctx, &game);
