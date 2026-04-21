@@ -82,7 +82,11 @@ impl SilkSongIndex {
 
     pub fn initialize(&mut self, blacklist: &[&str]) -> Result<(), SilkSongIndexError> {
         let packages = SilkSongPackageFetcher::fetch()?;
+        self.initialize_from_packages(packages, blacklist);
+        Ok(())
+    }
 
+    fn initialize_from_packages(&mut self, packages: Vec<SilkSongPackage>, blacklist: &[&str]) {
         let mut packages_by_full_name = HashMap::new();
         let mut latest_full_name_by_package_name = HashMap::new();
         let mut all_versions_by_full_name: HashMap<String, Vec<SilkSongFlattenedPackage>> =
@@ -122,7 +126,6 @@ impl SilkSongIndex {
         self.packages_by_full_name = packages_by_full_name;
         self.latest_full_name_by_package_name = latest_full_name_by_package_name;
         self.all_versions_by_full_name = all_versions_by_full_name;
-        Ok(())
     }
 
     pub fn get_package_by_full_name_with_version(
@@ -149,5 +152,81 @@ impl SilkSongIndex {
         full_name: &str,
     ) -> Option<Vec<SilkSongFlattenedPackage>> {
         self.all_versions_by_full_name.get(full_name).cloned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SilkSongIndex, SilkSongPackage, SilkSongVersion, split_package_name_with_version};
+
+    fn package(
+        full_name: &str,
+        owner: &str,
+        versions: Vec<(&str, &str, &str, Vec<&str>)>,
+    ) -> SilkSongPackage {
+        SilkSongPackage {
+            full_name: full_name.to_string(),
+            owner: owner.to_string(),
+            package_url: "https://example.test".to_string(),
+            versions: versions
+                .into_iter()
+                .map(
+                    |(full_name, version_number, description, dependencies)| SilkSongVersion {
+                        full_name: full_name.to_string(),
+                        description: description.to_string(),
+                        download_url: format!("https://example.test/{full_name}.zip"),
+                        version_number: version_number.to_string(),
+                        dependencies: dependencies.into_iter().map(str::to_string).collect(),
+                    },
+                )
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn split_package_name_with_version_splits_last_dash_only() {
+        assert_eq!(
+            split_package_name_with_version("Author-MyMod-1.2.3"),
+            ("Author-MyMod", "1.2.3")
+        );
+        assert_eq!(
+            split_package_name_with_version("NoVersion"),
+            ("NoVersion", "0.0.0")
+        );
+    }
+
+    #[test]
+    fn initialize_from_packages_builds_all_indexes_and_filters_blacklist() {
+        let mut index = SilkSongIndex::new();
+        index.initialize_from_packages(
+            vec![package(
+                "Author-Mod",
+                "Author",
+                vec![
+                    (
+                        "Author-Mod-2.0.0",
+                        "2.0.0",
+                        "latest",
+                        vec!["Keep-Dep-1.0.0", "Blocked-Dep-3.0.0"],
+                    ),
+                    ("Author-Mod-1.0.0", "1.0.0", "old", vec![]),
+                ],
+            )],
+            &["Blocked-Dep"],
+        );
+
+        let latest = index
+            .get_latest_package_by_package_name("Author-Mod")
+            .unwrap();
+        let all_versions = index.get_versions_by_full_name("Author-Mod").unwrap();
+
+        assert_eq!(latest.package_full_name_with_version, "Author-Mod-2.0.0");
+        assert_eq!(latest.dependencies, vec!["Keep-Dep-1.0.0".to_string()]);
+        assert_eq!(all_versions.len(), 2);
+        assert!(
+            index
+                .get_package_by_full_name_with_version("Author-Mod-1.0.0")
+                .is_some()
+        );
     }
 }

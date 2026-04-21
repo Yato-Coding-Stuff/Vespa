@@ -77,3 +77,108 @@ pub fn run<F: FnMut(InstallEvent)>(
     progress(InstallEvent::Finished);
     Ok(InstallResult::Installed)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{InstallResult, run};
+    use crate::{
+        packages::{SilkSongFlattenedPackage, SilkSongIndex},
+        tracker::sk_package_tracker::SilkSongPackageTracker,
+        util::{
+            config::{Config, GameSwitcher},
+            context::Context,
+        },
+    };
+
+    fn package(version: &str) -> SilkSongFlattenedPackage {
+        SilkSongFlattenedPackage {
+            package_full_name: "Author-Mod".to_string(),
+            owner: "Author".to_string(),
+            package_full_name_with_version: format!("Author-Mod-{version}"),
+            description: "desc".to_string(),
+            download_url: "https://example.test/mod.zip".to_string(),
+            version_number: version.to_string(),
+            dependencies: vec![],
+        }
+    }
+
+    fn empty_context() -> Context {
+        Context {
+            config: Config {
+                game_switcher: GameSwitcher::SilkSong,
+                sk_default_profile: None,
+                hk_default_profile: None,
+                hollow_knight_path: "/games/hk".into(),
+                silk_song_path: "/games/sk".into(),
+                index_path: "/config/index.json".into(),
+            },
+            tracker: SilkSongPackageTracker::new(),
+            index: SilkSongIndex::new(),
+            black_list: vec![],
+        }
+    }
+
+    #[test]
+    fn returns_already_installed_when_versions_match() {
+        let mut ctx = empty_context();
+        let installed = package("1.0.0");
+        ctx.tracker
+            .add(&installed, std::path::Path::new("/mods/Author-Mod-1.0.0"));
+        let mut events = Vec::new();
+
+        let result = run(
+            &mut ctx,
+            &installed,
+            false,
+            &mut |event| {
+                events.push(matches!(
+                    event,
+                    crate::cli::presenter::events::InstallEvent::Finished
+                ))
+            },
+            &"/profiles/default".into(),
+        )
+        .unwrap();
+
+        assert!(matches!(result, InstallResult::AlreadyInstalled));
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn returns_older_version_installed_when_installed_is_newer() {
+        let mut ctx = empty_context();
+        let installed = package("2.0.0");
+        ctx.tracker
+            .add(&installed, std::path::Path::new("/mods/Author-Mod-2.0.0"));
+
+        let result = run(
+            &mut ctx,
+            &package("1.0.0"),
+            false,
+            &mut |_| {},
+            &"/profiles/default".into(),
+        )
+        .unwrap();
+
+        assert!(matches!(result, InstallResult::OlderVersionInstalled));
+    }
+
+    #[test]
+    fn returns_newer_version_installed_when_installed_is_older() {
+        let mut ctx = empty_context();
+        let installed = package("1.0.0");
+        ctx.tracker
+            .add(&installed, std::path::Path::new("/mods/Author-Mod-1.0.0"));
+
+        let result = run(
+            &mut ctx,
+            &package("2.0.0"),
+            false,
+            &mut |_| {},
+            &"/profiles/default".into(),
+        )
+        .unwrap();
+
+        assert!(matches!(result, InstallResult::NewerVersionInstalled));
+    }
+}

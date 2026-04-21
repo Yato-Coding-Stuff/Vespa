@@ -105,3 +105,22 @@ pub enum ProfileArgs {
         profile: String,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Arg, GameCli, ProfileArgs, SubArgs};
+    use clap::Parser;
+
+    #[test]
+    fn parses_profile_list_subcommand() {
+        let args = Arg::try_parse_from(["vespa", "--game", "sk", "profile", "list"]).unwrap();
+
+        assert!(matches!(args.game, Some(GameCli::SK)));
+        assert!(matches!(
+            args.sub,
+            SubArgs::Profile {
+                args: ProfileArgs::List
+            }
+        ));
+    }
+}

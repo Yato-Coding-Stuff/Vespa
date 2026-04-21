@@ -81,3 +81,62 @@ pub fn recursively_copy_dir(src: &Path, dst: &Path) -> Result<(), FileHandlerErr
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{delete_dir, recursively_copy_dir, unzip_to_dir};
+    use std::{fs, io::Write};
+    use tempfile::tempdir;
+    use zip::write::SimpleFileOptions;
+
+    #[test]
+    fn recursively_copy_dir_copies_nested_files() {
+        let temp_dir = tempdir().unwrap();
+        let src = temp_dir.path().join("src");
+        let dst = temp_dir.path().join("dst");
+        fs::create_dir_all(src.join("nested")).unwrap();
+        fs::write(src.join("root.txt"), "root").unwrap();
+        fs::write(src.join("nested").join("child.txt"), "child").unwrap();
+
+        recursively_copy_dir(&src, &dst).unwrap();
+
+        assert_eq!(fs::read_to_string(dst.join("root.txt")).unwrap(), "root");
+        assert_eq!(
+            fs::read_to_string(dst.join("nested").join("child.txt")).unwrap(),
+            "child"
+        );
+    }
+
+    #[test]
+    fn delete_dir_removes_directory_tree() {
+        let temp_dir = tempdir().unwrap();
+        let dir = temp_dir.path().join("to-delete");
+        fs::create_dir_all(dir.join("nested")).unwrap();
+
+        delete_dir(&dir).unwrap();
+
+        assert!(!dir.exists());
+    }
+
+    #[test]
+    fn unzip_to_dir_extracts_files_and_directories() {
+        let temp_dir = tempdir().unwrap();
+        let zip_path = temp_dir.path().join("archive.zip");
+        let dest_dir = temp_dir.path().join("unzipped");
+
+        let zip_file = fs::File::create(&zip_path).unwrap();
+        let mut zip = zip::ZipWriter::new(zip_file);
+        let options = SimpleFileOptions::default();
+        zip.add_directory("folder/", options).unwrap();
+        zip.start_file("folder/file.txt", options).unwrap();
+        zip.write_all(b"hello world").unwrap();
+        zip.finish().unwrap();
+
+        unzip_to_dir(&zip_path, &dest_dir).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("folder").join("file.txt")).unwrap(),
+            "hello world"
+        );
+    }
+}
