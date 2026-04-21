@@ -143,6 +143,13 @@ impl Config {
             GameSwitcher::SilkSong => self.sk_default_profile.clone(),
         }
     }
+
+    pub fn get_game_path(&self, game: &GameSwitcher) -> &PathBuf {
+        match game {
+            GameSwitcher::HollowKnight => &self.hollow_knight_path,
+            GameSwitcher::SilkSong => &self.silk_song_path,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -216,6 +223,20 @@ mod tests {
         assert_eq!(
             config.get_default_profile(&GameSwitcher::HollowKnight),
             Some("hk-default".to_string())
+        );
+    }
+
+    #[test]
+    fn get_game_path_reads_correct_slot() {
+        let config = sample_config();
+
+        assert_eq!(
+            config.get_game_path(&GameSwitcher::SilkSong),
+            &config.silk_song_path
+        );
+        assert_eq!(
+            config.get_game_path(&GameSwitcher::HollowKnight),
+            &config.hollow_knight_path
         );
     }
 }

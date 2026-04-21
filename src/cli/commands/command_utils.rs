@@ -176,7 +176,16 @@ pub fn get_input_in_tracker(
 }
 
 pub fn resolve_profile_path(ctx: &Context, game: &GameSwitcher) -> Option<PathBuf> {
-    ctx.config.get_default_profile(game).map(PathBuf::from)
+    ctx.config.get_default_profile(game).map(|profile| {
+        let profile_path = PathBuf::from(&profile);
+        if profile_path.is_absolute() {
+            profile_path
+        } else {
+            crate::util::config::Config::config_dir()
+                .join(game.profile_dir_name())
+                .join(profile)
+        }
+    })
 }
 
 pub fn require_profile_path(ctx: &Context, game: &GameSwitcher) -> Result<PathBuf, String> {
@@ -202,8 +211,8 @@ mod tests {
         Context {
             config: Config {
                 game_switcher: GameSwitcher::SilkSong,
-                sk_default_profile: Some("/profiles/SK/default".to_string()),
-                hk_default_profile: Some("/profiles/HK/default".to_string()),
+                sk_default_profile: Some("default".to_string()),
+                hk_default_profile: Some("default".to_string()),
                 hollow_knight_path: "/games/hk".into(),
                 silk_song_path: "/games/sk".into(),
                 index_path: "/config/index.json".into(),
@@ -220,11 +229,22 @@ mod tests {
 
         assert_eq!(
             resolve_profile_path(&ctx, &GameSwitcher::SilkSong).unwrap(),
-            std::path::PathBuf::from("/profiles/SK/default")
+            Config::config_dir().join("SK").join("default")
         );
         assert_eq!(
             resolve_profile_path(&ctx, &GameSwitcher::HollowKnight).unwrap(),
-            std::path::PathBuf::from("/profiles/HK/default")
+            Config::config_dir().join("HK").join("default")
+        );
+    }
+
+    #[test]
+    fn resolve_profile_path_keeps_absolute_profile_paths() {
+        let mut ctx = context_with_defaults();
+        ctx.config.sk_default_profile = Some("/profiles/SK/default".to_string());
+
+        assert_eq!(
+            resolve_profile_path(&ctx, &GameSwitcher::SilkSong).unwrap(),
+            std::path::PathBuf::from("/profiles/SK/default")
         );
     }
 

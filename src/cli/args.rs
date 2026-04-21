@@ -82,6 +82,7 @@ pub enum SubArgs {
         #[arg(required = true)]
         package: String,
     },
+    Run {},
 
     Profile {
         #[command(subcommand)]
