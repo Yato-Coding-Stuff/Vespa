@@ -185,3 +185,56 @@ pub fn require_profile_path(ctx: &Context, game: &GameSwitcher) -> Result<PathBu
             .to_string()
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{require_profile_path, resolve_profile_path};
+    use crate::{
+        packages::SilkSongIndex,
+        tracker::sk_package_tracker::SilkSongPackageTracker,
+        util::{
+            config::{Config, GameSwitcher},
+            context::Context,
+        },
+    };
+
+    fn context_with_defaults() -> Context {
+        Context {
+            config: Config {
+                game_switcher: GameSwitcher::SilkSong,
+                sk_default_profile: Some("/profiles/SK/default".to_string()),
+                hk_default_profile: Some("/profiles/HK/default".to_string()),
+                hollow_knight_path: "/games/hk".into(),
+                silk_song_path: "/games/sk".into(),
+                index_path: "/config/index.json".into(),
+            },
+            tracker: SilkSongPackageTracker::new(),
+            index: SilkSongIndex::new(),
+            black_list: vec![],
+        }
+    }
+
+    #[test]
+    fn resolve_profile_path_uses_game_specific_default() {
+        let ctx = context_with_defaults();
+
+        assert_eq!(
+            resolve_profile_path(&ctx, &GameSwitcher::SilkSong).unwrap(),
+            std::path::PathBuf::from("/profiles/SK/default")
+        );
+        assert_eq!(
+            resolve_profile_path(&ctx, &GameSwitcher::HollowKnight).unwrap(),
+            std::path::PathBuf::from("/profiles/HK/default")
+        );
+    }
+
+    #[test]
+    fn require_profile_path_returns_error_when_missing() {
+        let mut ctx = context_with_defaults();
+        ctx.config.sk_default_profile = None;
+
+        let error = require_profile_path(&ctx, &GameSwitcher::SilkSong).unwrap_err();
+
+        assert!(error.contains("No default profile set"));
+    }
+}

@@ -63,3 +63,58 @@ impl SilkSongPackageTracker {
         self.packages.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::SilkSongPackageTracker;
+    use crate::packages::SilkSongFlattenedPackage;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn package(name: &str, version: &str) -> SilkSongFlattenedPackage {
+        SilkSongFlattenedPackage {
+            package_full_name: name.to_string(),
+            owner: "Author".to_string(),
+            package_full_name_with_version: format!("{name}-{version}"),
+            description: "desc".to_string(),
+            download_url: "https://example.test/mod.zip".to_string(),
+            version_number: version.to_string(),
+            dependencies: vec![],
+        }
+    }
+
+    #[test]
+    fn add_get_and_remove_track_package_records() {
+        let temp_dir = tempdir().unwrap();
+        let mod_path = temp_dir.path().join("Author-Mod-1.0.0");
+        let package = package("Author-Mod", "1.0.0");
+        let mut tracker = SilkSongPackageTracker::new();
+
+        tracker.add(&package, &mod_path);
+
+        let record = tracker.get("Author-Mod").unwrap();
+        assert_eq!(record.package_full_name_with_version, "Author-Mod-1.0.0");
+        assert_eq!(record.version_number.as_deref(), Some("1.0.0"));
+
+        tracker.remove("Author-Mod");
+        assert!(tracker.get("Author-Mod").is_none());
+    }
+
+    #[test]
+    fn scan_plugins_discovers_installed_packages_from_profile() {
+        let temp_dir = tempdir().unwrap();
+        let plugins_dir = temp_dir.path().join("BepInEx").join("plugins");
+        fs::create_dir_all(plugins_dir.join("Author-Mod-1.2.3")).unwrap();
+        fs::create_dir_all(plugins_dir.join("NoVersionMod")).unwrap();
+
+        let mut tracker = SilkSongPackageTracker::new();
+        tracker.scan_plugins(temp_dir.path());
+
+        let versioned = tracker.get("Author-Mod").unwrap();
+        let unversioned = tracker.get("NoVersionMod").unwrap();
+
+        assert_eq!(versioned.version_number.as_deref(), Some("1.2.3"));
+        assert_eq!(unversioned.version_number, None);
+        assert_eq!(tracker.get_all().len(), 2);
+    }
+}

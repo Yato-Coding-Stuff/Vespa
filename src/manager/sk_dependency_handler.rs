@@ -336,3 +336,123 @@ impl SilkSongReverseDependencyHandler {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::SilkSongReverseDependencyHandler;
+    use crate::{
+        packages::{SilkSongFlattenedPackage, SilkSongIndex, SilkSongInstalledPackageRecord},
+        tracker::sk_package_tracker::SilkSongPackageTracker,
+        util::{
+            config::{Config, GameSwitcher},
+            context::Context,
+        },
+    };
+
+    fn package(name: &str, version: &str, dependencies: Vec<&str>) -> SilkSongFlattenedPackage {
+        SilkSongFlattenedPackage {
+            package_full_name: name.to_string(),
+            owner: "Author".to_string(),
+            package_full_name_with_version: format!("{name}-{version}"),
+            description: "desc".to_string(),
+            download_url: "https://example.test/mod.zip".to_string(),
+            version_number: version.to_string(),
+            dependencies: dependencies.into_iter().map(str::to_string).collect(),
+        }
+    }
+
+    fn context_with_packages(
+        tracked: Vec<SilkSongInstalledPackageRecord>,
+        indexed: Vec<SilkSongFlattenedPackage>,
+    ) -> Context {
+        let mut tracker = SilkSongPackageTracker::new();
+        for package in tracked {
+            tracker.add(
+                &SilkSongFlattenedPackage {
+                    package_full_name: package.package_full_name.clone(),
+                    owner: "Author".to_string(),
+                    package_full_name_with_version: package.package_full_name_with_version.clone(),
+                    description: "desc".to_string(),
+                    download_url: "https://example.test/mod.zip".to_string(),
+                    version_number: package
+                        .version_number
+                        .clone()
+                        .unwrap_or("0.0.0".to_string()),
+                    dependencies: vec![],
+                },
+                &package.file_path,
+            );
+        }
+
+        let mut index = SilkSongIndex::new();
+        index.packages_by_full_name = indexed
+            .iter()
+            .cloned()
+            .map(|pkg| (pkg.package_full_name_with_version.clone(), pkg))
+            .collect();
+
+        Context {
+            config: Config {
+                game_switcher: GameSwitcher::SilkSong,
+                sk_default_profile: None,
+                hk_default_profile: None,
+                hollow_knight_path: "/games/hk".into(),
+                silk_song_path: "/games/sk".into(),
+                index_path: "/config/index.json".into(),
+            },
+            tracker,
+            index,
+            black_list: vec![],
+        }
+    }
+
+    #[test]
+    fn package_is_required_checks_dependency_by_package_name() {
+        let tracked = vec![SilkSongInstalledPackageRecord {
+            package_full_name_with_version: "Author-ModA-1.0.0".to_string(),
+            package_full_name: "Author-ModA".to_string(),
+            version_number: Some("1.0.0".to_string()),
+            file_path: "/mods/Author-ModA-1.0.0".into(),
+        }];
+        let indexed = vec![package(
+            "Author-ModA",
+            "1.0.0",
+            vec!["Author-Dependency-2.1.0"],
+        )];
+        let ctx = context_with_packages(tracked, indexed);
+
+        assert!(SilkSongReverseDependencyHandler::package_is_required(
+            &ctx,
+            "Author-Dependency"
+        ));
+        assert!(!SilkSongReverseDependencyHandler::package_is_required(
+            &ctx,
+            "SomethingElse"
+        ));
+    }
+
+    #[test]
+    fn dependency_is_required_checks_full_dependency_identifier() {
+        let tracked = vec![SilkSongInstalledPackageRecord {
+            package_full_name_with_version: "Author-ModA-1.0.0".to_string(),
+            package_full_name: "Author-ModA".to_string(),
+            version_number: Some("1.0.0".to_string()),
+            file_path: "/mods/Author-ModA-1.0.0".into(),
+        }];
+        let indexed = vec![package(
+            "Author-ModA",
+            "1.0.0",
+            vec!["Author-Dependency-2.1.0"],
+        )];
+        let ctx = context_with_packages(tracked, indexed);
+
+        assert!(SilkSongReverseDependencyHandler::dependency_is_required(
+            &ctx,
+            "Author-Dependency-2.1.0"
+        ));
+        assert!(!SilkSongReverseDependencyHandler::dependency_is_required(
+            &ctx,
+            "Author-Dependency-1.0.0"
+        ));
+    }
+}

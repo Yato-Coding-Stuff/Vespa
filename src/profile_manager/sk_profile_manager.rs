@@ -174,12 +174,7 @@ impl SilkSongProfileManager {
     }
 
     fn get_profiles_dir(&self, game: &GameSwitcher) -> PathBuf {
-        let game_name = match game {
-            GameSwitcher::HollowKnight => "HK",
-            GameSwitcher::SilkSong => "SK",
-        };
-
-        self.base_dir.join(game_name)
+        self.base_dir.join(game.profile_dir_name())
     }
 
     fn install_bepinex(
@@ -203,5 +198,78 @@ impl SilkSongProfileManager {
         install_progress(InstallEvent::Finished);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SilkSongProfileManager, SilkSongProfileManagerError};
+    use crate::{
+        cli::presenter::presenter::Presenter,
+        packages::SilkSongIndex,
+        tracker::sk_package_tracker::SilkSongPackageTracker,
+        util::{
+            config::{Config, GameSwitcher},
+            context::Context,
+        },
+    };
+    use tempfile::tempdir;
+
+    fn test_context() -> Context {
+        Context {
+            config: Config {
+                game_switcher: GameSwitcher::SilkSong,
+                sk_default_profile: None,
+                hk_default_profile: None,
+                hollow_knight_path: "/games/hk".into(),
+                silk_song_path: "/games/sk".into(),
+                index_path: "/config/index.json".into(),
+            },
+            tracker: SilkSongPackageTracker::new(),
+            index: SilkSongIndex::new(),
+            black_list: vec!["BepInEx-BepInExPack_Silksong"],
+        }
+    }
+
+    #[test]
+    fn list_profiles_returns_sorted_names() {
+        let temp_dir = tempdir().unwrap();
+        let manager = SilkSongProfileManager::new(temp_dir.path().to_path_buf());
+        std::fs::create_dir_all(temp_dir.path().join("SK").join("zeta")).unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("SK").join("alpha")).unwrap();
+
+        let profiles = manager.list_profiles(&GameSwitcher::SilkSong).unwrap();
+
+        assert_eq!(profiles, vec!["alpha".to_string(), "zeta".to_string()]);
+    }
+
+    #[test]
+    fn list_profiles_returns_empty_when_game_dir_does_not_exist() {
+        let temp_dir = tempdir().unwrap();
+        let manager = SilkSongProfileManager::new(temp_dir.path().to_path_buf());
+
+        let profiles = manager.list_profiles(&GameSwitcher::HollowKnight).unwrap();
+
+        assert!(profiles.is_empty());
+    }
+
+    #[test]
+    fn set_profile_as_default_errors_when_profile_is_missing() {
+        let temp_dir = tempdir().unwrap();
+        let manager = SilkSongProfileManager::new(temp_dir.path().to_path_buf());
+        let mut ctx = test_context();
+        let mut presenter = Presenter::new();
+
+        let result = manager.set_profile_as_default(
+            &mut ctx,
+            &mut presenter,
+            &GameSwitcher::SilkSong,
+            "missing",
+        );
+
+        assert!(matches!(
+            result,
+            Err(SilkSongProfileManagerError::DefaultProfileDoesNotExist(name)) if name == "missing"
+        ));
     }
 }

@@ -180,3 +180,107 @@ impl SilkSongPackageManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{SilkSongPackageManager, SilkSongPackageManagerError};
+    use crate::{
+        packages::{SilkSongFlattenedPackage, SilkSongIndex, SilkSongInstalledPackageRecord},
+        tracker::sk_package_tracker::SilkSongPackageTracker,
+        util::{
+            config::{Config, GameSwitcher},
+            context::Context,
+        },
+    };
+
+    fn context() -> Context {
+        Context {
+            config: Config {
+                game_switcher: GameSwitcher::SilkSong,
+                sk_default_profile: None,
+                hk_default_profile: None,
+                hollow_knight_path: "/games/hk".into(),
+                silk_song_path: "/games/sk".into(),
+                index_path: "/config/index.json".into(),
+            },
+            tracker: SilkSongPackageTracker::new(),
+            index: SilkSongIndex::new(),
+            black_list: vec!["Blocked-Mod"],
+        }
+    }
+
+    fn flattened(name: &str) -> SilkSongFlattenedPackage {
+        SilkSongFlattenedPackage {
+            package_full_name: name.to_string(),
+            owner: "Author".to_string(),
+            package_full_name_with_version: format!("{name}-1.0.0"),
+            description: "desc".to_string(),
+            download_url: "https://example.test/mod.zip".to_string(),
+            version_number: "1.0.0".to_string(),
+            dependencies: vec![],
+        }
+    }
+
+    fn installed(name: &str) -> SilkSongInstalledPackageRecord {
+        SilkSongInstalledPackageRecord {
+            package_full_name_with_version: format!("{name}-1.0.0"),
+            package_full_name: name.to_string(),
+            version_number: Some("1.0.0".to_string()),
+            file_path: format!("/mods/{name}-1.0.0").into(),
+        }
+    }
+
+    #[test]
+    fn install_package_rejects_blacklisted_package_before_downloading() {
+        let manager = SilkSongPackageManager::new();
+        let mut ctx = context();
+
+        let result = manager.install_package(
+            &mut ctx,
+            &flattened("Blocked-Mod"),
+            &mut |_| {},
+            &"/profiles/default".into(),
+        );
+
+        assert!(matches!(
+            result,
+            Err(SilkSongPackageManagerError::PackageBlacklisted(name)) if name == "Blocked-Mod-1.0.0"
+        ));
+    }
+
+    #[test]
+    fn uninstall_package_rejects_blacklisted_package_before_installer_runs() {
+        let manager = SilkSongPackageManager::new();
+        let mut ctx = context();
+
+        let result = manager.uninstall_package(
+            &mut ctx,
+            &installed("Blocked-Mod"),
+            &mut |_| {},
+            &"/profiles/default".into(),
+        );
+
+        assert!(matches!(
+            result,
+            Err(SilkSongPackageManagerError::PackageBlacklisted(name)) if name == "Blocked-Mod-1.0.0"
+        ));
+    }
+
+    #[test]
+    fn update_package_rejects_blacklisted_package_before_downloading() {
+        let manager = SilkSongPackageManager::new();
+        let mut ctx = context();
+
+        let result = manager.update_package(
+            &mut ctx,
+            &flattened("Blocked-Mod"),
+            &mut |_| {},
+            &"/profiles/default".into(),
+        );
+
+        assert!(matches!(
+            result,
+            Err(SilkSongPackageManagerError::PackageBlacklisted(name)) if name == "Blocked-Mod-1.0.0"
+        ));
+    }
+}
