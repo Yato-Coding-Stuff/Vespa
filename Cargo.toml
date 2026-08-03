@@ -15,6 +15,7 @@ thiserror = "*"
 dirs = "*"
 toml = "*"
 serde_json = "*"
+quick-xml = {version = "*", features = ["serialize"]}
 zip = "*"
 semver = {version = "*", features = ["serde"] }
 clap = { version = "*", features = ["derive"] }

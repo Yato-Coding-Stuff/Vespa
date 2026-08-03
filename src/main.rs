@@ -1,15 +1,28 @@
-mod cli;
-mod handlers;
-mod manager;
-mod packages;
-mod profile_manager;
-mod tracker;
-mod util;
+mod app;
+mod base;
+mod hk;
+mod sk;
 
-use crate::{cli::command_dispatcher, util::context::Context};
+use crate::{
+    app::{application::App, game_services::GameServices},
+    base::{
+        cli::{args::Arg, command_dispatcher},
+        util::context::Context,
+    },
+};
+use clap::Parser;
 
 fn main() {
-    let mut context = Context::new().expect("Failed to create context");
+    let args = Arg::parse();
+    let context = Context::new().expect("Failed to create context");
 
-    command_dispatcher::run(&mut context);
+    let active_game = match args.game {
+        Some(game) => game.into(),
+        None => context.config.game_switcher.clone(),
+    };
+
+    let game_services = GameServices::for_game(&active_game);
+    let mut app = App::new(active_game, context, game_services);
+
+    command_dispatcher::run(&mut app, args);
 }
