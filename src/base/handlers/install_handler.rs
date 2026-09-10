@@ -26,6 +26,9 @@ pub enum InstallError {
 
     #[error("Dependency errors: {0:?}")]
     DependencyErrors(Vec<DependencyHandlerError>),
+
+    #[error("Invalid package version: {0}")]
+    InvalidVersion(String),
 }
 
 pub fn run<F: FnMut(InstallEvent)>(
@@ -39,7 +42,10 @@ pub fn run<F: FnMut(InstallEvent)>(
     let pm = app.game_services.package_manager.as_ref();
     let dependency_manager = DependencyHandler::new(pm);
 
-    let requested_version = package.version.parse::<Version>().unwrap();
+    let requested_version = package
+        .version
+        .parse::<Version>()
+        .map_err(|_| InstallError::InvalidVersion(package.version.clone()))?;
 
     if !force {
         match ctx.tracker.get(&package.name) {
@@ -70,7 +76,7 @@ pub fn run<F: FnMut(InstallEvent)>(
     }
 
     dependency_manager
-        .handle_dependencies(ctx, package.dependencies.clone(), progress, profile_path)
+        .install_dependencies(ctx, package.dependencies.clone(), progress, profile_path)
         .map_err(InstallError::DependencyErrors)?;
     pm.install_package(ctx, package, progress, profile_path)?;
 

@@ -58,21 +58,25 @@ pub fn list_available(ctx: &mut Context, queries: Vec<String>, all_versions: boo
 
 pub fn list_installed(ctx: &mut Context, query: Vec<String>) {
     let all_packages = ctx.tracker.get_all();
-    let filtered: Vec<_> = all_packages
+    let mut filtered: Vec<_> = all_packages
         .values()
         .filter(|p| {
             query.is_empty()
-                || query.iter().any(|q| {
-                    p.name
-                        .to_lowercase()
-                        .contains(&q.to_lowercase())
-                })
+                || query
+                    .iter()
+                    .any(|q| p.name.to_lowercase().contains(&q.to_lowercase()))
         })
         .collect();
 
+    filtered.sort_by(|left, right| left.identifier.cmp(&right.identifier));
+
     if filtered.is_empty() {
-        for query in query {
-            println!("==> No matches found for '{}'", query);
+        if query.is_empty() {
+            println!("==> No installed packages found");
+        } else {
+            for query in query {
+                println!("==> No matches found for '{}'", query);
+            }
         }
         return;
     }

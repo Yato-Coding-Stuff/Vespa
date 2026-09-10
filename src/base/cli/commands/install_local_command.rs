@@ -3,12 +3,16 @@ use std::path::PathBuf;
 
 use crate::app::application::App;
 
-pub fn install(app: &mut App, package_paths: Vec<PathBuf>, profile_path: &PathBuf) {
+pub fn install(
+    app: &mut App,
+    package_paths: Vec<PathBuf>,
+    profile_path: &PathBuf,
+) -> Result<(), String> {
     match app.initialize_index() {
         Ok(_) => (),
         Err(e) => {
             println!("==> {}", e);
-            return;
+            return Err(e.to_string());
         }
     }
 
@@ -23,25 +27,26 @@ pub fn install(app: &mut App, package_paths: Vec<PathBuf>, profile_path: &PathBu
         ))
         .report(false)
         .interact()
-        .unwrap()
+        .map_err(|error| error.to_string())?
     {
         println!("==> Aborted installation");
-        return;
+        return Ok(());
     }
 
     for package in package_paths {
-        match app
-            .game_services
-            .package_manager
-            .install_local_package(&package, profile_path)
-        {
+        match app.game_services.package_manager.install_local_package(
+            &mut app.context,
+            &package,
+            profile_path,
+        ) {
             Ok(()) => {
                 println!("==> Installed {}", package.to_string_lossy());
             }
             Err(e) => {
                 println!("==> {}", e);
-                return;
+                return Err(e.to_string());
             }
         }
     }
+    Ok(())
 }

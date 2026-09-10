@@ -1,4 +1,7 @@
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    time::Duration,
+};
 
 use reqwest::blocking::Client;
 use tempfile::TempDir;
@@ -19,6 +22,8 @@ pub enum PackageDownloaderError {
 
 pub struct PackageDownloader;
 
+const MAX_PACKAGE_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
+
 impl PackageDownloader {
     pub fn new() -> Self {
         PackageDownloader
@@ -35,7 +40,11 @@ impl PackageDownloader {
             .parse::<reqwest::Url>()
             .map_err(|e| PackageDownloaderError::InvalidUrl(e.to_string()))?;
 
-        let client = Client::new();
+        let client = Client::builder()
+            .connect_timeout(Duration::from_secs(15))
+            .timeout(Duration::from_secs(120))
+            .build()
+            .map_err(PackageDownloaderError::Http)?;
         let mut response = client.get(parsed_url).send()?;
 
         if !response.status().is_success() {
@@ -45,6 +54,12 @@ impl PackageDownloader {
         }
 
         let total = response.content_length().unwrap_or(0);
+        if total > MAX_PACKAGE_DOWNLOAD_BYTES {
+            return Err(PackageDownloaderError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "package download exceeds the 512 MiB safety limit",
+            )));
+        }
 
         progress(InstallEvent::StartingDownload { total });
 
@@ -62,6 +77,12 @@ impl PackageDownloader {
 
             file.write_all(&buffer[..n])?;
             downloaded += n as u64;
+            if downloaded > MAX_PACKAGE_DOWNLOAD_BYTES {
+                return Err(PackageDownloaderError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "package download exceeds the 512 MiB safety limit",
+                )));
+            }
 
             progress(InstallEvent::DownloadProgress { downloaded });
         }

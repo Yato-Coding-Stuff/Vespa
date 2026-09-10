@@ -79,14 +79,14 @@ pub enum SubArgs {
         all_versions: bool,
     },
     Show {
-        // TODO:
-        // show available mods instead of insatlled ones
-        //
         #[arg(required = true)]
         package: String,
     },
     Run {},
-
+    Prime {},
+    Unprime {},
+    // TODO:
+    // SetGame {}
     Profile {
         #[command(subcommand)]
         args: ProfileArgs,
@@ -96,6 +96,8 @@ pub enum SubArgs {
 #[derive(Subcommand, Debug)]
 pub enum ProfileArgs {
     List,
+    // TODO:
+    // add a --set-default flag
     Create {
         #[arg(required = true)]
         profile: String,

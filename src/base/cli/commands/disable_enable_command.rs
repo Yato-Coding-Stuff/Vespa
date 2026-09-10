@@ -8,7 +8,11 @@ use crate::{
     },
 };
 
-pub fn disable(app: &mut App, presenter: &mut Presenter, packages: Vec<String>) {
+pub fn disable(
+    app: &mut App,
+    presenter: &mut Presenter,
+    packages: Vec<String>,
+) -> Result<(), String> {
     let mut presenter = |event| presenter.display(&event);
 
     let pm = app.game_services.package_manager.as_ref();
@@ -18,7 +22,7 @@ pub fn disable(app: &mut App, presenter: &mut Presenter, packages: Vec<String>) 
         Ok(packages) => packages,
         Err(e) => {
             println!("{}", e);
-            return;
+            return Err(e);
         }
     };
 
@@ -38,21 +42,31 @@ pub fn disable(app: &mut App, presenter: &mut Presenter, packages: Vec<String>) 
         ))
         .report(false)
         .interact()
-        .unwrap()
+        .map_err(|error| error.to_string())?
     {
         println!("==> Aborted installation");
-        return;
+        return Ok(());
     }
 
+    let mut errors = Vec::new();
     for package in packages {
         match pm.disable_package(&mut presenter, package) {
             Ok(_) => (),
-            Err(e) => println!("==> {}", e),
+            Err(e) => errors.push(e.to_string()),
         }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
     }
 }
 
-pub fn enable(app: &mut App, presenter: &mut Presenter, packages: Vec<String>) {
+pub fn enable(
+    app: &mut App,
+    presenter: &mut Presenter,
+    packages: Vec<String>,
+) -> Result<(), String> {
     let mut presenter = |event| presenter.display(&event);
 
     let pm = app.game_services.package_manager.as_ref();
@@ -62,7 +76,7 @@ pub fn enable(app: &mut App, presenter: &mut Presenter, packages: Vec<String>) {
         Ok(packages) => packages,
         Err(e) => {
             println!("{}", e);
-            return;
+            return Err(e);
         }
     };
 
@@ -82,16 +96,22 @@ pub fn enable(app: &mut App, presenter: &mut Presenter, packages: Vec<String>) {
         ))
         .report(false)
         .interact()
-        .unwrap()
+        .map_err(|error| error.to_string())?
     {
         println!("==> Aborted installation");
-        return;
+        return Ok(());
     }
 
+    let mut errors = Vec::new();
     for package in packages {
         match pm.enable_package(&mut presenter, package) {
             Ok(_) => (),
-            Err(e) => println!("==> {}", e),
+            Err(e) => errors.push(e.to_string()),
         }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
     }
 }

@@ -1,3 +1,4 @@
+use semver::Version;
 use std::collections::HashMap;
 
 use thiserror::Error;
@@ -29,6 +30,8 @@ impl Index {
                 .or_default()
                 .push(package);
         }
+
+        self.sort_versions();
     }
 
     pub fn insert(&mut self, package: PackageRecord) {
@@ -36,6 +39,7 @@ impl Index {
             .entry(package.name.clone())
             .or_default()
             .push(package);
+        self.sort_versions();
     }
 
     pub fn get_package_by_identifier(&self, identifier: &str) -> Option<PackageRecord> {
@@ -46,10 +50,7 @@ impl Index {
             .cloned()
     }
 
-    pub fn get_latest_package_by_package_name(
-        &self,
-        package_name: &str,
-    ) -> Option<PackageRecord> {
+    pub fn get_latest_package_by_package_name(&self, package_name: &str) -> Option<PackageRecord> {
         self.packages_by_name
             .get(package_name)
             .and_then(|versions| versions.first())
@@ -58,6 +59,19 @@ impl Index {
 
     pub fn get_versions_by_name(&self, name: &str) -> Option<Vec<PackageRecord>> {
         self.packages_by_name.get(name).cloned()
+    }
+
+    fn sort_versions(&mut self) {
+        for versions in self.packages_by_name.values_mut() {
+            versions.sort_by(|a, b| {
+                match (Version::parse(&a.version), Version::parse(&b.version)) {
+                    (Ok(a), Ok(b)) => b.cmp(&a),
+                    (Ok(_), Err(_)) => std::cmp::Ordering::Less,
+                    (Err(_), Ok(_)) => std::cmp::Ordering::Greater,
+                    (Err(_), Err(_)) => std::cmp::Ordering::Equal,
+                }
+            });
+        }
     }
 }
 
@@ -97,6 +111,24 @@ mod tests {
             index
                 .get_package_by_identifier("Author-Mod-1.0.0")
                 .is_some()
+        );
+    }
+
+    #[test]
+    fn sorts_versions_instead_of_trusting_feed_order() {
+        let mut index = Index::new();
+        index.replace([
+            package("Author-Mod", "1.0.0"),
+            package("Author-Mod", "3.0.0"),
+            package("Author-Mod", "2.0.0"),
+        ]);
+
+        assert_eq!(
+            index
+                .get_latest_package_by_package_name("Author-Mod")
+                .unwrap()
+                .version,
+            "3.0.0"
         );
     }
 }

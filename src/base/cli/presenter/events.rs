@@ -190,7 +190,10 @@ pub enum ProfileManagerEvent {
     },
     InstallingBepInEx {
         name: String,
-        game: String,
+        path: String,
+    },
+    InstallingModdingApi {
+        name: String,
         path: String,
     },
     DeletingProfileDirectory {
@@ -224,10 +227,13 @@ impl Event for ProfileManagerEvent {
                     name, game, path
                 );
             }
-            ProfileManagerEvent::InstallingBepInEx { name, game, path } => {
+            ProfileManagerEvent::InstallingBepInEx { name, path } => {
+                println!("==> Installing BepInEx for profile {} at {}", name, path);
+            }
+            ProfileManagerEvent::InstallingModdingApi { name, path } => {
                 println!(
-                    "==> Installing BepInEx for profile {} ({}) at {}",
-                    name, game, path
+                    "==> Installing Modding API for profile {} at {}",
+                    name, path
                 );
             }
             ProfileManagerEvent::DeletingProfileDirectory { name, game, path } => {

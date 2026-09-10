@@ -14,7 +14,13 @@ use clap::Parser;
 
 fn main() {
     let args = Arg::parse();
-    let context = Context::new().expect("Failed to create context");
+    let context = match Context::new() {
+        Ok(context) => context,
+        Err(error) => {
+            eprintln!("Failed to load Vespa configuration: {error}");
+            std::process::exit(1);
+        }
+    };
 
     let active_game = match args.game {
         Some(game) => game.into(),

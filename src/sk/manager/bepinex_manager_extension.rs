@@ -4,16 +4,12 @@ use tempfile::TempDir;
 
 use crate::base::{
     cli::presenter::events::InstallEvent,
-    manager::{
-        package_installer::PackageInstallerError,
-        package_manager::{PackageManager, PackageManagerError},
-    },
+    manager::package_manager::{PackageManager, PackageManagerError},
     packages::{InstalledPackageRecord, PackageRecord},
-    util::{
-        context::Context,
-        file_handler::{recursively_copy_dir, unzip_to_dir},
-    },
+    util::{context::Context, file_handler::unzip_to_dir},
 };
+
+pub(crate) const BEPINEX_PACKAGE_NAME: &str = "BepInEx-BepInExPack_Silksong";
 
 pub(crate) trait BepInExPackageManagerExt {
     fn install_bepinex(
@@ -33,14 +29,14 @@ impl BepInExPackageManagerExt for PackageManager {
         progress: &mut dyn FnMut(InstallEvent),
         bepinex_path: &Path,
     ) -> Result<(), PackageManagerError> {
-        let zip_dir = self.downloader.download(&package.download_url, progress)?;
+        let zip_dir = self.download_archive(&package.download_url, progress)?;
         progress(InstallEvent::FinishedDownloadingMod {
             name: package.identifier.clone(),
         });
         progress(InstallEvent::InstallingMod {
             name: package.identifier.clone(),
         });
-        match unpack_bepinex(ctx, package, &zip_dir, bepinex_path) {
+        match unpack_bepinex(self, ctx, package, &zip_dir, bepinex_path) {
             Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }
@@ -48,18 +44,24 @@ impl BepInExPackageManagerExt for PackageManager {
 }
 
 fn unpack_bepinex(
+    manager: &PackageManager,
     ctx: &mut Context,
     package: &PackageRecord,
     dir: &TempDir,
     bepinex_path: &Path,
-) -> Result<(), PackageInstallerError> {
+) -> Result<(), PackageManagerError> {
     let zip_path = dir.path().join("package.zip");
     let unzip_dir = dir.path().join("unzipped");
 
     unzip_to_dir(&zip_path, &unzip_dir)?;
     let bepinexpack_path = unzip_dir.join("BepInExPack");
 
-    recursively_copy_dir(&bepinexpack_path, bepinex_path)?;
+    let previous = ctx
+        .tracker
+        .get(&package.name)
+        .map(|record| record.file_path.clone());
+    manager.commit_installation(&bepinexpack_path, bepinex_path, previous.as_deref())?;
+    manager.write_version_marker(bepinex_path, &package.version)?;
 
     ctx.tracker.insert(InstalledPackageRecord {
         name: package.name.clone(),

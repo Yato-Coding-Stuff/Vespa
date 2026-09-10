@@ -31,21 +31,47 @@ pub enum FileHandlerError {
 
     #[error("Failed to copy file: {0}")]
     CopyFileError(#[source] io::Error),
+
+    #[error("Failed to replace directory: {0}")]
+    ReplaceDirError(#[source] io::Error),
+
+    #[error("Archive exceeds safety limits")]
+    ArchiveTooLarge,
 }
+
+const MAX_ARCHIVE_ENTRIES: usize = 10_000;
+const MAX_EXTRACTED_BYTES: u64 = 512 * 1024 * 1024;
 
 pub fn unzip_to_dir(zip_path: &Path, dest_dir: &Path) -> Result<(), FileHandlerError> {
     let file = File::open(zip_path).map_err(FileHandlerError::OpenZipError)?;
     let mut archive = ZipArchive::new(file).map_err(FileHandlerError::ReadZipEntryError)?;
 
+    if archive.len() > MAX_ARCHIVE_ENTRIES {
+        return Err(FileHandlerError::ArchiveTooLarge);
+    }
+
+    let mut extracted_bytes = 0u64;
+
     for i in 0..archive.len() {
         let mut file = archive
             .by_index(i)
             .map_err(FileHandlerError::ReadZipEntryError)?;
-        let outpath = dest_dir.join(file.name());
+
+        let Some(enclosed_name) = file.enclosed_name() else {
+            continue; // Skip paths that escape the destination directory
+        };
+
+        let outpath = dest_dir.join(enclosed_name);
 
         if file.is_dir() {
             fs::create_dir_all(&outpath).map_err(FileHandlerError::CreateZipDirError)?;
         } else {
+            extracted_bytes = extracted_bytes
+                .checked_add(file.size())
+                .ok_or(FileHandlerError::ArchiveTooLarge)?;
+            if extracted_bytes > MAX_EXTRACTED_BYTES {
+                return Err(FileHandlerError::ArchiveTooLarge);
+            }
             if let Some(parent) = outpath.parent() {
                 fs::create_dir_all(parent).map_err(FileHandlerError::CreateZipDirError)?;
             }

@@ -4,8 +4,8 @@ use crate::{
         args::{Arg, ProfileArgs, SubArgs},
         commands::{
             command_utils, disable_enable_command, install_command, install_local_command,
-            list_command, profile_command, run_command, show_command, uninstall_command,
-            update_command,
+            list_command, prime_command, profile_command, run_command, show_command,
+            uninstall_command, unprime_command, update_command,
         },
         presenter::presenter::Presenter,
     },
@@ -18,28 +18,79 @@ pub fn run(app: &mut App, args: Arg) {
     match args.sub {
         SubArgs::Install { packages } => {
             let profile_path = require_profile_path_or_exit(app);
-            app.initialize_tracker(&profile_path);
-            install_command::install(app, &mut presenter, packages, &profile_path);
+            if let Err(error) = app.initialize_tracker(&profile_path) {
+                eprintln!("Failed to scan profile: {error}");
+                return;
+            }
+            if let Err(error) =
+                crate::base::runtime::profile_mutation::run(app, &profile_path, |app| {
+                    install_command::install(app, &mut presenter, packages, &profile_path)
+                })
+            {
+                eprintln!("Profile mutation aborted: {error}");
+            }
         }
         SubArgs::InstallLocal { package_paths } => {
             let profile_path = require_profile_path_or_exit(app);
-            app.initialize_tracker(&profile_path);
-            install_local_command::install(app, package_paths, &profile_path);
+            if let Err(error) = app.initialize_tracker(&profile_path) {
+                eprintln!("Failed to scan profile: {error}");
+                return;
+            }
+            if let Err(error) =
+                crate::base::runtime::profile_mutation::run(app, &profile_path, |app| {
+                    install_local_command::install(app, package_paths, &profile_path)
+                })
+            {
+                eprintln!("Profile mutation aborted: {error}");
+            }
         }
         SubArgs::Uninstall { packages, force } => {
             let profile_path = require_profile_path_or_exit(app);
-            app.initialize_tracker(&profile_path);
-            uninstall_command::uninstall(app, &mut presenter, packages, force, &profile_path);
+            if let Err(error) = app.initialize_tracker(&profile_path) {
+                eprintln!("Failed to scan profile: {error}");
+                return;
+            }
+            if let Err(error) =
+                crate::base::runtime::profile_mutation::run(app, &profile_path, |app| {
+                    uninstall_command::uninstall(
+                        app,
+                        &mut presenter,
+                        packages,
+                        force,
+                        &profile_path,
+                    )
+                })
+            {
+                eprintln!("Profile mutation aborted: {error}");
+            }
         }
         SubArgs::Disable { packages } => {
             let profile_path = require_profile_path_or_exit(app);
-            app.initialize_tracker(&profile_path);
-            disable_enable_command::disable(app, &mut presenter, packages);
+            if let Err(error) = app.initialize_tracker(&profile_path) {
+                eprintln!("Failed to scan profile: {error}");
+                return;
+            }
+            if let Err(error) =
+                crate::base::runtime::profile_mutation::run(app, &profile_path, |app| {
+                    disable_enable_command::disable(app, &mut presenter, packages)
+                })
+            {
+                eprintln!("Profile mutation aborted: {error}");
+            }
         }
         SubArgs::Enable { packages } => {
             let profile_path = require_profile_path_or_exit(app);
-            app.initialize_tracker(&profile_path);
-            disable_enable_command::enable(app, &mut presenter, packages);
+            if let Err(error) = app.initialize_tracker(&profile_path) {
+                eprintln!("Failed to scan profile: {error}");
+                return;
+            }
+            if let Err(error) =
+                crate::base::runtime::profile_mutation::run(app, &profile_path, |app| {
+                    disable_enable_command::enable(app, &mut presenter, packages)
+                })
+            {
+                eprintln!("Profile mutation aborted: {error}");
+            }
         }
         SubArgs::List {
             packages,
@@ -48,7 +99,10 @@ pub fn run(app: &mut App, args: Arg) {
         } => {
             if !available {
                 let profile_path = require_profile_path_or_exit(app);
-                app.initialize_tracker(&profile_path);
+                if let Err(error) = app.initialize_tracker(&profile_path) {
+                    eprintln!("Failed to scan profile: {error}");
+                    return;
+                }
             }
             list_command::list(app, packages, available, all_versions);
         }
@@ -59,17 +113,33 @@ pub fn run(app: &mut App, args: Arg) {
             let profile_path = require_profile_path_or_exit(app);
             run_command::run(app, &profile_path);
         }
+        SubArgs::Prime {} => {
+            let profile_path = require_profile_path_or_exit(app);
+            prime_command::prime(app, &profile_path);
+        }
+        SubArgs::Unprime {} => {
+            unprime_command::unprime(app);
+        }
         SubArgs::Update { packages } => {
             let profile_path = require_profile_path_or_exit(app);
-            app.initialize_tracker(&profile_path);
-            update_command::update(app, &mut presenter, packages, &profile_path);
+            if let Err(error) = app.initialize_tracker(&profile_path) {
+                eprintln!("Failed to scan profile: {error}");
+                return;
+            }
+            if let Err(error) =
+                crate::base::runtime::profile_mutation::run(app, &profile_path, |app| {
+                    update_command::update(app, &mut presenter, packages, &profile_path)
+                })
+            {
+                eprintln!("Profile mutation aborted: {error}");
+            }
         }
         SubArgs::Profile { args } => match args {
             ProfileArgs::List => {
                 profile_command::list(app);
             }
             ProfileArgs::Create { profile } => {
-                profile_command::create(app, &mut presenter,profile);
+                profile_command::create(app, &mut presenter, profile);
             }
             ProfileArgs::Delete { profile } => {
                 profile_command::delete(app, &mut presenter, profile);

@@ -45,6 +45,8 @@ pub enum ConfigError {
     TomlError(#[from] toml::ser::Error),
     #[error("Unable to load config: {0}")]
     LoadError(#[from] toml::de::Error),
+    #[error("Unable to determine a configuration directory on this system")]
+    MissingConfigDirectory,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,15 +65,14 @@ impl Config {
     }
 
     fn create_default_in_dir(config_dir: &Path) -> Result<String, ConfigError> {
-        let home = dirs::home_dir().expect("Unable to get home directory");
         fs::create_dir_all(&config_dir)?;
 
         let config = Config {
             game_switcher: GameSwitcher::SilkSong,
             default_profile: None,
             hk_default_profile: None,
-            hollow_knight_path: home.join("code/git/yato/Vespa/resources/HK"),
-            silk_song_path: home.join("code/git/yato/Vespa/resources/SK"),
+            hollow_knight_path: PathBuf::new(),
+            silk_song_path: PathBuf::new(),
             index_path: config_dir.join("index.json"),
         };
 
@@ -81,8 +82,9 @@ impl Config {
     }
 
     pub fn config_dir() -> PathBuf {
-        let home = dirs::home_dir().expect("Unable to get home directory");
-        home.join(".config/vespa")
+        dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("vespa")
     }
 
     pub fn config_path() -> PathBuf {
@@ -96,11 +98,16 @@ impl Config {
     pub fn load_from_path(config_path: &Path) -> Result<Self, ConfigError> {
         let config_dir = config_path
             .parent()
-            .expect("Config path should have a parent directory");
+            .ok_or(ConfigError::MissingConfigDirectory)?;
 
         // If file doesn't exist, create default
-        let serialized =
-            fs::read_to_string(config_path).or_else(|_| Self::create_default_in_dir(config_dir))?;
+        let serialized = match fs::read_to_string(config_path) {
+            Ok(serialized) => serialized,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Self::create_default_in_dir(config_dir)?
+            }
+            Err(error) => return Err(error.into()),
+        };
         let config: Config = toml::from_str(&serialized)?;
         Ok(config)
     }

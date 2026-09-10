@@ -3,24 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OperatingSystem {
-    Linux,
-    Windows,
-    Unsupported,
-}
-
-impl OperatingSystem {
-    pub fn current() -> OperatingSystem {
-        if cfg!(target_os = "linux") {
-            OperatingSystem::Linux
-        } else if cfg!(target_os = "windows") {
-            OperatingSystem::Windows
-        } else {
-            OperatingSystem::Unsupported
-        }
-    }
-}
+use crate::base::util::platform::OperatingSystem;
 
 pub struct LaunchRequest<'a> {
     pub os: OperatingSystem,

@@ -1,5 +1,4 @@
 use dialoguer::Confirm;
-use semver::Version;
 use std::path::PathBuf;
 
 use crate::{
@@ -16,12 +15,12 @@ pub fn update(
     presenter: &mut Presenter,
     packages: Vec<String>,
     profile_path: &PathBuf,
-) {
+) -> Result<(), String> {
     match app.initialize_index() {
         Ok(_) => (),
         Err(e) => {
             println!("==> {}", e);
-            return;
+            return Err(e.to_string());
         }
     }
 
@@ -30,7 +29,7 @@ pub fn update(
             Ok(packages) => packages,
             Err(e) => {
                 println!("{}", e);
-                return;
+                return Err(e);
             }
         };
 
@@ -50,12 +49,13 @@ pub fn update(
             ))
             .report(false)
             .interact()
-            .unwrap()
+            .map_err(|error| error.to_string())?
         {
             println!("==> Aborted installation");
-            return;
+            return Ok(());
         }
 
+        let mut errors = Vec::new();
         for package in packages {
             match update_handler::run(app, package, presenter, false, profile_path) {
                 Ok(UpdateResult::NotInstalled) => {
@@ -68,43 +68,19 @@ pub fn update(
                     println!("==> Already newest version of {}", package.identifier);
                 }
                 Err(e) => {
-                    println!("==> {}", e);
+                    errors.push(e.to_string());
                 }
             }
         }
+        if !errors.is_empty() {
+            return Err(errors.join("; "));
+        }
     } else {
-        // Collect all installed packages
-        let packages = app
-            .context
-            .tracker
-            .get_all()
-            .iter()
-            .filter_map(|(_, installed)| {
-                let latest = app
-                    .context
-                    .index
-                    .get_latest_package_by_package_name(&installed.name)?;
-
-                let installed_version = installed
-                    .version
-                    .as_deref()
-                    .unwrap_or("0.0.0")
-                    .parse::<Version>()
-                    .unwrap_or_else(|_| Version::new(0, 0, 0));
-
-                let latest_version = latest.version.parse::<Version>().unwrap();
-
-                if installed_version < latest_version {
-                    Some(latest)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<PackageRecord>>();
+        let packages = update_handler::packages_to_update(&app.context);
 
         if packages.is_empty() {
             println!("==> No packages to update");
-            return;
+            return Ok(());
         }
 
         if !Confirm::new()
@@ -118,12 +94,13 @@ pub fn update(
             ))
             .report(false)
             .interact()
-            .unwrap()
+            .map_err(|error| error.to_string())?
         {
             println!("==> Aborted installation");
-            return;
+            return Ok(());
         }
 
+        let mut errors = Vec::new();
         for package in packages {
             match update_handler::run(app, &package, presenter, true, profile_path) {
                 Ok(UpdateResult::NotInstalled) => {
@@ -136,9 +113,13 @@ pub fn update(
                     println!("==> Already newest version of {}", package.name);
                 }
                 Err(e) => {
-                    println!("==> {}", e);
+                    errors.push(e.to_string());
                 }
             }
         }
+        if !errors.is_empty() {
+            return Err(errors.join("; "));
+        }
     }
+    Ok(())
 }

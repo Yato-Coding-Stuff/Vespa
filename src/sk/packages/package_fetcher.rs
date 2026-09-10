@@ -1,3 +1,4 @@
+use std::time::Duration;
 use thiserror::Error;
 
 use crate::sk::packages::package::SkPackageDto;
@@ -17,7 +18,14 @@ impl PackageFetcher {
 
     /// Fetch packages and immediately flatten them into PackageRecord
     pub fn fetch() -> Result<Vec<SkPackageDto>, FetcherError> {
-        let resp = reqwest::blocking::get(Self::URL)
+        let client = reqwest::blocking::Client::builder()
+            .connect_timeout(Duration::from_secs(15))
+            .timeout(Duration::from_secs(60))
+            .build()
+            .map_err(|e| FetcherError::FetcherError(e.to_string()))?;
+        let resp = client
+            .get(Self::URL)
+            .send()
             .map_err(|e| FetcherError::FetcherError(e.to_string()))?;
 
         let packages: Vec<SkPackageDto> = resp

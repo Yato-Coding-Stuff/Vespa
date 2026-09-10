@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use semver::Version;
 use thiserror::Error;
@@ -6,8 +6,80 @@ use thiserror::Error;
 use crate::base::{
     cli::presenter::events::{InstallEvent, UninstallEvent, UpdateEvent},
     manager::package_manager::PackageManager,
+    packages::{PackageRecord, package_index::Index},
     util::context::Context,
 };
+
+#[derive(Debug, Error)]
+enum DependencyResolutionError {
+    #[error("Dependency not found: {0}")]
+    Missing(String),
+    #[error("Dependency cycle detected at: {0}")]
+    Cycle(String),
+}
+
+struct DependencyResolver;
+
+impl DependencyResolver {
+    fn resolve(
+        ctx: &Context,
+        dependencies: &[String],
+    ) -> Result<Vec<PackageRecord>, Vec<DependencyResolutionError>> {
+        let mut resolved = Vec::new();
+        let mut visiting = HashSet::new();
+        let mut errors = Vec::new();
+
+        for dependency in dependencies {
+            if let Err(error) =
+                Self::resolve_one(&ctx.index, dependency, &mut visiting, &mut resolved)
+            {
+                errors.push(error);
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(resolved)
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn resolve_one(
+        index: &Index,
+        dependency: &str,
+        visiting: &mut HashSet<String>,
+        resolved: &mut Vec<PackageRecord>,
+    ) -> Result<(), DependencyResolutionError> {
+        if resolved
+            .iter()
+            .any(|package| package.identifier == dependency)
+        {
+            return Ok(());
+        }
+        if !visiting.insert(dependency.to_string()) {
+            return Err(DependencyResolutionError::Cycle(dependency.to_string()));
+        }
+
+        let package = match index.get_package_by_identifier(dependency) {
+            Some(package) => package,
+            None => {
+                visiting.remove(dependency);
+                return Err(DependencyResolutionError::Missing(dependency.to_string()));
+            }
+        };
+
+        for nested in &package.dependencies {
+            if let Err(error) = Self::resolve_one(index, nested, visiting, resolved) {
+                visiting.remove(dependency);
+                return Err(error);
+            }
+        }
+
+        visiting.remove(dependency);
+        resolved.push(package);
+        Ok(())
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum DependencyHandlerError {
@@ -34,7 +106,7 @@ impl<'pm> DependencyHandler<'pm> {
         }
     }
 
-    pub fn handle_dependencies<F: FnMut(InstallEvent)>(
+    pub fn install_dependencies<F: FnMut(InstallEvent)>(
         &self,
         ctx: &mut Context,
         dependencies: Vec<String>,
@@ -45,11 +117,19 @@ impl<'pm> DependencyHandler<'pm> {
             dependencies: dependencies.clone(),
         });
 
-        let mut errors: Vec<DependencyHandlerError> = Vec::new();
-        for dependency in dependencies {
-            match self.handle_single_dependency(ctx, dependency, progress, profile_path) {
-                Ok(_) => (),
-                Err(e) => errors.push(e),
+        let packages = DependencyResolver::resolve(ctx, &dependencies).map_err(|errors| {
+            errors
+                .into_iter()
+                .map(Self::resolution_error)
+                .collect::<Vec<_>>()
+        })?;
+
+        let mut errors = Vec::new();
+        for package in packages {
+            if let Err(error) =
+                self.install_resolved_dependency(ctx, package, progress, profile_path)
+            {
+                errors.push(error);
             }
         }
 
@@ -60,19 +140,24 @@ impl<'pm> DependencyHandler<'pm> {
         Ok(())
     }
 
-    fn handle_single_dependency<F: FnMut(InstallEvent)>(
+    fn resolution_error(error: DependencyResolutionError) -> DependencyHandlerError {
+        match error {
+            DependencyResolutionError::Missing(dependency) => {
+                DependencyHandlerError::DependencyMissing(dependency)
+            }
+            DependencyResolutionError::Cycle(dependency) => DependencyHandlerError::InstallError(
+                format!("Dependency cycle detected at {dependency}"),
+            ),
+        }
+    }
+
+    fn install_resolved_dependency<F: FnMut(InstallEvent)>(
         &self,
         ctx: &mut Context,
-        dependency: String,
+        package: PackageRecord,
         progress: &mut F,
         profile_path: &PathBuf,
     ) -> Result<(), DependencyHandlerError> {
-        let package = ctx
-            .index
-            .get_package_by_identifier(&dependency)
-            .ok_or_else(|| DependencyHandlerError::DependencyMissing(dependency.clone()))?
-            .clone();
-
         let parsed_required_version = Version::parse(&package.version)
             .map_err(|_| DependencyHandlerError::VersionParseError(package.version.clone()))?;
 
@@ -124,19 +209,26 @@ impl<'pm> DependencyHandler<'pm> {
         &self,
         ctx: &mut Context,
         dependencies: Vec<String>,
-        force: bool,
         progress: &mut F,
         profile_path: &PathBuf,
-    ) -> Result<Vec<String>, Vec<DependencyHandlerError>> {
+    ) -> Result<(), Vec<DependencyHandlerError>> {
         progress(UninstallEvent::UninstallingDependencies {
             dependencies: dependencies.clone(),
         });
 
+        let packages = DependencyResolver::resolve(ctx, &dependencies).map_err(|errors| {
+            errors
+                .into_iter()
+                .map(Self::resolution_error)
+                .collect::<Vec<_>>()
+        })?;
+
         let mut errors: Vec<DependencyHandlerError> = Vec::new();
-        let mut still_required = Vec::new();
-        for dependency in dependencies {
-            if ReverseDependencyHandler::dependency_is_required(ctx, &dependency) && !force {
-                still_required.push(dependency.clone());
+        for package in packages {
+            let dependency = package.identifier;
+            // `force` applies to the package explicitly requested for removal.
+            // Its dependencies must remain installed while another package uses them.
+            if ReverseDependencyHandler::dependency_is_required(ctx, &dependency) {
                 continue;
             }
 
@@ -150,7 +242,7 @@ impl<'pm> DependencyHandler<'pm> {
             return Err(errors);
         }
 
-        Ok(still_required)
+        Ok(())
     }
 
     fn uninstall_single_dependency<F: FnMut(UninstallEvent)>(
@@ -176,20 +268,7 @@ impl<'pm> DependencyHandler<'pm> {
             }
         };
 
-        let is_required = ctx.tracker.get_all().values().any(|installed_pkg| {
-            match ctx
-                .index
-                .get_package_by_identifier(&installed_pkg.identifier)
-            {
-                Some(installed_package_info) => installed_package_info
-                    .dependencies
-                    .iter()
-                    .any(|dep| dep == &dependency),
-                None => false,
-            }
-        });
-
-        if is_required {
+        if ReverseDependencyHandler::dependency_is_required(ctx, &package.name) {
             return Err(DependencyHandlerError::DependencyStillRequired(
                 dependency.clone(),
             ));
@@ -256,8 +335,9 @@ impl<'pm> DependencyHandler<'pm> {
             .clone();
 
         // Parse required version
-        let required_version = Version::parse(&package_newest_version.version)
-            .map_err(|_| DependencyHandlerError::VersionParseError(package.version.clone()))?;
+        let required_version = Version::parse(&package_newest_version.version).map_err(|_| {
+            DependencyHandlerError::VersionParseError(package_newest_version.version.clone())
+        })?;
 
         // Check installed version
         if let Some(installed) = ctx.tracker.get(&package.name) {
@@ -277,7 +357,7 @@ impl<'pm> DependencyHandler<'pm> {
                 progress(UpdateEvent::UpdatingDependency {
                     name: package.name.clone(),
                     old_version: installed_version.to_string(),
-                    new_version: package.version.clone(),
+                    new_version: package_newest_version.version.clone(),
                 });
             }
         } else {
@@ -303,22 +383,29 @@ impl<'pm> DependencyHandler<'pm> {
 pub struct ReverseDependencyHandler;
 
 impl ReverseDependencyHandler {
-    pub fn package_is_required(ctx: &Context, target: &str) -> bool {
-        ctx.tracker.get_all().values().any(|installed_pkg| {
-            match ctx
-                .index
-                .get_package_by_identifier(&installed_pkg.identifier)
-            {
-                Some(installed_info) => installed_info.dependencies.iter().any(|dep| {
-                    let dep_name = dep.rsplitn(2, '-').nth(1).unwrap_or(dep);
-                    dep_name == target
-                }),
-                None => false,
-            }
-        })
+    pub fn packages_requiring(ctx: &Context, target: &str) -> Vec<String> {
+        ctx.tracker
+            .get_all()
+            .values()
+            .filter(|installed_pkg| {
+                let Some(installed_info) = ctx
+                    .index
+                    .get_package_by_identifier(&installed_pkg.identifier)
+                else {
+                    return false;
+                };
+
+                installed_info
+                    .dependencies
+                    .iter()
+                    .any(|dep| Self::dependency_name(dep) == target)
+            })
+            .map(|pkg| pkg.identifier.clone())
+            .collect()
     }
 
     pub fn dependency_is_required(ctx: &Context, target: &str) -> bool {
+        let target_name = Self::dependency_name(target);
         ctx.tracker.get_all().values().any(|installed_pkg| {
             match ctx
                 .index
@@ -327,16 +414,23 @@ impl ReverseDependencyHandler {
                 Some(installed_package_info) => installed_package_info
                     .dependencies
                     .iter()
-                    .any(|dep| dep == target),
+                    .any(|dep| Self::dependency_name(dep) == target_name),
                 None => false,
             }
         })
+    }
+
+    fn dependency_name(identifier: &str) -> &str {
+        match identifier.rsplit_once('-') {
+            Some((name, version)) if Version::parse(version).is_ok() => name,
+            _ => identifier,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ReverseDependencyHandler;
+    use super::{DependencyResolutionError, DependencyResolver, ReverseDependencyHandler};
     use crate::base::{
         packages::{Index, InstalledPackageRecord, PackageRecord},
         tracker::package_tracker::PackageTracker,
@@ -384,7 +478,7 @@ mod tests {
     }
 
     #[test]
-    fn package_is_required_checks_dependency_by_package_name() {
+    fn packages_requiring_returns_dependents_by_package_name() {
         let tracked = vec![InstalledPackageRecord {
             identifier: "Author-ModA-1.0.0".to_string(),
             name: "Author-ModA".to_string(),
@@ -398,18 +492,15 @@ mod tests {
         )];
         let ctx = context_with_packages(tracked, indexed);
 
-        assert!(ReverseDependencyHandler::package_is_required(
-            &ctx,
-            "Author-Dependency"
-        ));
-        assert!(!ReverseDependencyHandler::package_is_required(
-            &ctx,
-            "SomethingElse"
-        ));
+        assert_eq!(
+            ReverseDependencyHandler::packages_requiring(&ctx, "Author-Dependency"),
+            vec!["Author-ModA-1.0.0"]
+        );
+        assert!(ReverseDependencyHandler::packages_requiring(&ctx, "SomethingElse").is_empty());
     }
 
     #[test]
-    fn dependency_is_required_checks_full_dependency_identifier() {
+    fn dependency_is_required_matches_dependency_package_name_across_versions() {
         let tracked = vec![InstalledPackageRecord {
             identifier: "Author-ModA-1.0.0".to_string(),
             name: "Author-ModA".to_string(),
@@ -427,9 +518,45 @@ mod tests {
             &ctx,
             "Author-Dependency-2.1.0"
         ));
-        assert!(!ReverseDependencyHandler::dependency_is_required(
+        assert!(ReverseDependencyHandler::dependency_is_required(
             &ctx,
             "Author-Dependency-1.0.0"
+        ));
+    }
+
+    #[test]
+    fn resolver_orders_nested_dependencies_before_dependents() {
+        let indexed = vec![
+            package("A", "1.0.0", vec!["B-1.0.0"]),
+            package("B", "1.0.0", vec!["C-1.0.0"]),
+            package("C", "1.0.0", vec![]),
+        ];
+        let ctx = context_with_packages(Vec::new(), indexed);
+
+        let resolved = DependencyResolver::resolve(&ctx, &["A-1.0.0".to_string()]).unwrap();
+
+        assert_eq!(
+            resolved
+                .into_iter()
+                .map(|package| package.name)
+                .collect::<Vec<_>>(),
+            vec!["C", "B", "A"]
+        );
+    }
+
+    #[test]
+    fn resolver_reports_dependency_cycles() {
+        let indexed = vec![
+            package("A", "1.0.0", vec!["B-1.0.0"]),
+            package("B", "1.0.0", vec!["A-1.0.0"]),
+        ];
+        let ctx = context_with_packages(Vec::new(), indexed);
+
+        let errors = DependencyResolver::resolve(&ctx, &["A-1.0.0".to_string()]).unwrap_err();
+
+        assert!(matches!(
+            errors.as_slice(),
+            [DependencyResolutionError::Cycle(name)] if name == "A-1.0.0"
         ));
     }
 }

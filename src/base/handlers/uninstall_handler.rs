@@ -16,7 +16,7 @@ use thiserror::Error;
 pub enum UninstallResult {
     Uninstalled,
     NotInstalled,
-    PackageStillRequired,
+    PackageStillRequired { packages: Vec<String> },
 }
 
 #[derive(Debug, Error)]
@@ -39,8 +39,9 @@ pub fn run<F: FnMut(UninstallEvent)>(
     let deps = DependencyHandler::new(pm);
     let ctx = &mut app.context;
 
-    if ReverseDependencyHandler::package_is_required(ctx, &package.name) && !force {
-        return Ok(UninstallResult::PackageStillRequired);
+    let packages = ReverseDependencyHandler::packages_requiring(ctx, &package.name);
+    if !packages.is_empty() && !force {
+        return Ok(UninstallResult::PackageStillRequired { packages });
     }
 
     pm.uninstall_package(ctx, package, progress, profile_path)?;
@@ -50,17 +51,9 @@ pub fn run<F: FnMut(UninstallEvent)>(
         .get_package_by_identifier(&package.identifier)
         .map(|p| p.dependencies);
 
-    match dep {
-        Some(dep) => {
-            let still_required = deps
-                .uninstall_dependencies(ctx, dep, force, progress, profile_path)
-                .map_err(UninstallError::DependencyErrors)?;
-
-            if !still_required.is_empty() {
-                return Ok(UninstallResult::PackageStillRequired);
-            }
-        }
-        None => {}
+    if let Some(dep) = dep {
+        deps.uninstall_dependencies(ctx, dep, progress, profile_path)
+            .map_err(UninstallError::DependencyErrors)?;
     }
 
     Ok(UninstallResult::Uninstalled)
@@ -149,6 +142,56 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(result, UninstallResult::PackageStillRequired));
+        assert!(matches!(
+            result,
+            UninstallResult::PackageStillRequired { packages }
+                if packages == vec!["Author-Mod-1.0.0"]
+        ));
+    }
+
+    #[test]
+    fn uninstalls_package_when_no_dependents_require_it() {
+        let target = package("Author-Dependency", "1.0.0", vec![]);
+        let temp_dir = tempfile::tempdir().unwrap();
+        let package_dir = temp_dir.path().join("Author-Dependency-1.0.0");
+        std::fs::create_dir_all(&package_dir).unwrap();
+
+        let mut tracker = PackageTracker::new();
+        tracker.insert(InstalledPackageRecord {
+            name: target.name.clone(),
+            identifier: target.identifier.clone(),
+            version: Some(target.version.clone()),
+            file_path: package_dir.clone(),
+        });
+        let mut index = Index::new();
+        index.replace([target.clone()]);
+
+        let game = GameSwitcher::SilkSong;
+        let context = Context {
+            config: Config {
+                game_switcher: game.clone(),
+                default_profile: None,
+                hk_default_profile: None,
+                hollow_knight_path: "/games/hk".into(),
+                silk_song_path: "/games/sk".into(),
+                index_path: "/config/index.json".into(),
+            },
+            tracker,
+            index,
+        };
+        let mut app = App::new(game.clone(), context, GameServices::for_game(&game));
+        let installed = app.context.tracker.get(&target.name).unwrap().clone();
+
+        let result = run(
+            &mut app,
+            &installed,
+            false,
+            &mut |_| {},
+            &temp_dir.path().to_path_buf(),
+        )
+        .unwrap();
+
+        assert!(matches!(result, UninstallResult::Uninstalled));
+        assert!(!package_dir.exists());
     }
 }

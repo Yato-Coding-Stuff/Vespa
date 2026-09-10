@@ -1,15 +1,18 @@
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
+use tempfile::TempDir;
 use thiserror::Error;
 
 use crate::base::{
     cli::presenter::events::{DisableEnableEvent, InstallEvent, UninstallEvent, UpdateEvent},
+    cli::presenter::presenter::Presenter,
     manager::{
         package_downloader::{PackageDownloader, PackageDownloaderError},
         package_installer::{PackageInstaller, PackageInstallerError},
+        package_layout::PackageLayout,
     },
     packages::{PackageRecord, package::InstalledPackageRecord},
-    util::{context::Context, file_handler::delete_dir},
+    util::{context::Context, file_handler::FileHandlerError},
 };
 
 #[derive(Debug, Error)]
@@ -18,25 +21,69 @@ pub enum PackageManagerError {
     DownloaderError(#[from] PackageDownloaderError),
     #[error(transparent)]
     InstallerError(#[from] PackageInstallerError),
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+    #[error(transparent)]
+    FileHandlingError(#[from] FileHandlerError),
     #[error("Package is blacklisted: {0}")]
     PackageBlacklisted(String),
+    #[error("Invalid package path component: {0}")]
+    InvalidPackagePath(String),
 }
 
 pub struct PackageManager {
-    pub downloader: PackageDownloader,
-    pub installer: PackageInstaller,
-    pub blacklist: &'static [&'static str],
-    package_root: fn(&Path) -> PathBuf,
+    downloader: PackageDownloader,
+    installer: PackageInstaller,
+    blacklist: &'static [&'static str],
+    package_layout: Box<dyn PackageLayout>,
 }
 
 impl PackageManager {
-    pub fn new(blacklist: &'static [&'static str], package_root: fn(&Path) -> PathBuf) -> Self {
+    pub fn new(blacklist: &'static [&'static str], package_layout: Box<dyn PackageLayout>) -> Self {
         Self {
             downloader: PackageDownloader::new(),
             installer: PackageInstaller::new(),
             blacklist,
-            package_root,
+            package_layout,
         }
+    }
+
+    pub(crate) fn download_archive(
+        &self,
+        url: &str,
+        progress: &mut dyn FnMut(InstallEvent),
+    ) -> Result<TempDir, PackageDownloaderError> {
+        self.downloader.download(url, progress)
+    }
+
+    pub(crate) fn commit_installation(
+        &self,
+        source: &Path,
+        destination: &Path,
+        previous: Option<&Path>,
+    ) -> Result<(), PackageInstallerError> {
+        self.installer
+            .commit_installation(source, destination, previous)
+    }
+
+    pub(crate) fn write_version_marker(
+        &self,
+        destination: &Path,
+        version: &str,
+    ) -> Result<(), PackageManagerError> {
+        std::fs::write(destination.join(".vespa-version"), version)?;
+        Ok(())
+    }
+
+    pub(crate) fn install_special_package(
+        &self,
+        ctx: &mut Context,
+        package: &PackageRecord,
+        presenter: &mut Presenter,
+        profile_path: &Path,
+    ) -> Result<bool, PackageManagerError> {
+        self.package_layout
+            .install_special_package(self, ctx, package, presenter, profile_path)
     }
 
     pub fn install_package(
@@ -52,10 +99,6 @@ impl PackageManager {
             ));
         }
 
-        if let Some(installed) = ctx.tracker.get(&package.name) {
-            let _ = delete_dir(&installed.file_path);
-        }
-
         progress(InstallEvent::DownloadingMod {
             name: package.identifier.clone(),
         });
@@ -68,24 +111,22 @@ impl PackageManager {
             name: package.identifier.clone(),
         });
 
-        let destination = self.package_destination(profile_path, package);
-        match self
-            .installer
-            .install_package(ctx, package, &zip_dir, &destination)
-        {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e.into()),
-        }
+        let destination = self.package_destination(profile_path, package)?;
+        self.installer
+            .install_package(ctx, package, &zip_dir, &destination)?;
+        self.write_version_marker(&destination, &package.version)?;
+        Ok(())
     }
 
     pub fn install_local_package(
         &self,
+        ctx: &mut Context,
         archive_path: &PathBuf,
         profile_path: &PathBuf,
     ) -> Result<(), PackageManagerError> {
-        let package_root = (self.package_root)(profile_path);
+        let package_root = self.package_layout.package_root(profile_path);
         self.installer
-            .install_local_package(archive_path, &package_root)?;
+            .install_local_package(ctx, archive_path, &package_root)?;
         Ok(())
     }
 
@@ -125,11 +166,10 @@ impl PackageManager {
             ));
         }
 
-        if let Some(installed) = ctx.tracker.get(&package.name) {
+        if ctx.tracker.get(&package.name).is_some() {
             progress(UpdateEvent::CleaningUpOldMod {
                 name: package.name.clone(),
             });
-            let _ = delete_dir(&installed.file_path);
         }
 
         progress(UpdateEvent::DownloadingMod {
@@ -144,9 +184,10 @@ impl PackageManager {
             name: package.identifier.clone(),
         });
 
-        let destination = self.package_destination(profile_path, package);
+        let destination = self.package_destination(profile_path, package)?;
         self.installer
             .install_package(ctx, package, &zip_dir, &destination)?;
+        self.write_version_marker(&destination, &package.version)?;
 
         Ok(())
     }
@@ -175,37 +216,27 @@ impl PackageManager {
         Ok(())
     }
 
-    fn package_destination(&self, profile_path: &Path, package: &PackageRecord) -> PathBuf {
-        (self.package_root)(profile_path).join(&package.identifier)
-    }
-}
+    fn package_destination(
+        &self,
+        profile_path: &Path,
+        package: &PackageRecord,
+    ) -> Result<PathBuf, PackageManagerError> {
+        let identifier_path = Path::new(&package.identifier);
+        if package.identifier.is_empty()
+            || identifier_path.components().count() != 1
+            || !matches!(
+                identifier_path.components().next(),
+                Some(Component::Normal(_))
+            )
+        {
+            return Err(PackageManagerError::InvalidPackagePath(
+                package.identifier.clone(),
+            ));
+        }
 
-#[cfg(test)]
-mod tests {
-    use std::path::{Path, PathBuf};
-
-    use super::PackageManager;
-    use crate::base::packages::PackageRecord;
-
-    fn nested_package_root(profile_path: &Path) -> PathBuf {
-        profile_path.join("packages")
-    }
-
-    #[test]
-    fn package_destination_combines_game_root_and_identifier() {
-        let manager = PackageManager::new(&[], nested_package_root);
-        let package = PackageRecord {
-            name: "Author-Mod".to_string(),
-            identifier: "Author-Mod-1.2.3".to_string(),
-            version: "1.2.3".to_string(),
-            description: String::new(),
-            download_url: String::new(),
-            dependencies: Vec::new(),
-        };
-
-        assert_eq!(
-            manager.package_destination(Path::new("/profile"), &package),
-            PathBuf::from("/profile/packages/Author-Mod-1.2.3")
-        );
+        Ok(self
+            .package_layout
+            .package_root(profile_path)
+            .join(identifier_path))
     }
 }

@@ -17,14 +17,14 @@ pub fn uninstall(
     packages: Vec<String>,
     force: bool,
     profile_path: &PathBuf,
-) {
+) -> Result<(), String> {
     let mut presenter = |event| presenter.display(&event);
 
     match app.initialize_index() {
         Ok(_) => (),
         Err(e) => {
             println!("==> {}", e);
-            return;
+            return Err(e.to_string());
         }
     }
 
@@ -32,7 +32,7 @@ pub fn uninstall(
         Ok(packages) => packages,
         Err(e) => {
             println!("{}", e);
-            return;
+            return Err(e);
         }
     };
 
@@ -52,12 +52,13 @@ pub fn uninstall(
         ))
         .report(false)
         .interact()
-        .unwrap()
+        .map_err(|error| error.to_string())?
     {
         println!("==> Aborted installation");
-        return;
+        return Ok(());
     }
 
+    let mut errors = Vec::new();
     for package in packages {
         match uninstall_handler::run(app, package, force, &mut presenter, profile_path) {
             Ok(UninstallResult::Uninstalled) => {
@@ -66,13 +67,22 @@ pub fn uninstall(
             Ok(UninstallResult::NotInstalled) => {
                 println!("==> {} is not installed", package.identifier);
             }
-            Ok(UninstallResult::PackageStillRequired) => {
-                println!("==> {} is required by another package", package.identifier);
+            Ok(UninstallResult::PackageStillRequired { packages }) => {
+                println!(
+                    "==> {} is required by the following packages: {:?}",
+                    package.identifier,
+                    packages.join(", ")
+                );
                 println!("==> Please re-run with --force if you want to uninstall anyway");
             }
             Err(e) => {
-                println!("==> Failed to uninstall {}: {e}", package.identifier);
+                errors.push(format!("Failed to uninstall {}: {e}", package.identifier));
             }
         }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
     }
 }

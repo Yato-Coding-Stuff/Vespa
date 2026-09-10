@@ -4,5 +4,6 @@ pub mod manager;
 pub mod packages;
 pub mod profile_manager;
 pub mod runner;
+pub mod runtime;
 pub mod tracker;
 pub mod util;

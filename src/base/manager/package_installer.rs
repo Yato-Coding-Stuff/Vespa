@@ -1,6 +1,6 @@
-use std::ffi::OsStr;
 use std::fs::{read_dir, rename};
 use std::path::PathBuf;
+use std::{ffi::OsStr, fs, io};
 
 use tempfile::TempDir;
 use thiserror::Error;
@@ -30,7 +30,63 @@ pub struct PackageInstaller;
 
 impl PackageInstaller {
     pub fn new() -> Self {
-        PackageInstaller
+        Self
+    }
+
+    pub(crate) fn commit_installation(
+        &self,
+        source: &std::path::Path,
+        destination: &std::path::Path,
+        previous: Option<&std::path::Path>,
+    ) -> Result<(), PackageInstallerError> {
+        let parent = destination
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
+        fs::create_dir_all(parent).map_err(FileHandlerError::CreateDirError)?;
+
+        let name = destination
+            .file_name()
+            .ok_or_else(|| {
+                FileHandlerError::ReplaceDirError(io::Error::other("invalid destination"))
+            })?
+            .to_string_lossy();
+        let suffix = std::process::id();
+        let staging = parent.join(format!(".{name}.vespa-staging-{suffix}"));
+        let backup = parent.join(format!(".{name}.vespa-backup-{suffix}"));
+
+        if staging.exists() {
+            fs::remove_dir_all(&staging).map_err(FileHandlerError::ReplaceDirError)?;
+        }
+        if backup.exists() {
+            fs::remove_dir_all(&backup).map_err(FileHandlerError::ReplaceDirError)?;
+        }
+
+        recursively_copy_dir(source, &staging)?;
+
+        let had_destination = destination.exists();
+        if had_destination {
+            fs::rename(destination, &backup).map_err(FileHandlerError::ReplaceDirError)?;
+        }
+
+        if let Err(error) = fs::rename(&staging, destination) {
+            if had_destination {
+                let _ = fs::rename(&backup, destination);
+            }
+            let _ = fs::remove_dir_all(&staging);
+            return Err(FileHandlerError::ReplaceDirError(error).into());
+        }
+
+        if had_destination {
+            fs::remove_dir_all(&backup).map_err(FileHandlerError::ReplaceDirError)?;
+        }
+
+        if let Some(previous) = previous {
+            if previous != destination && previous.exists() {
+                delete_dir(previous)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn install_package(
@@ -45,7 +101,11 @@ impl PackageInstaller {
 
         unzip_to_dir(&zip_path, &unzip_dir)?;
 
-        recursively_copy_dir(&unzip_dir, &destination)?;
+        let previous = ctx
+            .tracker
+            .get(&package.name)
+            .map(|record| record.file_path.clone());
+        self.commit_installation(&unzip_dir, destination, previous.as_deref())?;
 
         ctx.tracker.insert(InstalledPackageRecord {
             name: package.name.clone(),
@@ -57,10 +117,9 @@ impl PackageInstaller {
         Ok(())
     }
 
-    // TODO
-    // this should also save into the index, otherwise we have no way of removing them afterwards
     pub fn install_local_package(
         &self,
+        ctx: &mut Context,
         dir: &PathBuf,
         package_root: &PathBuf,
     ) -> Result<(), PackageInstallerError> {
@@ -74,11 +133,34 @@ impl PackageInstaller {
 
         unzip_to_dir(zip_path, &unzip_dir)?;
 
-        let package_name = zip_path.file_stem().unwrap();
+        let package_name = zip_path.file_stem().ok_or_else(|| {
+            PackageInstallerError::IOError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "local package archive has no filename",
+            ))
+        })?;
+        if package_name == std::ffi::OsStr::new(".") || package_name == std::ffi::OsStr::new("..") {
+            return Err(PackageInstallerError::IOError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid local package filename",
+            )));
+        }
 
         let mod_path = package_root.join(package_name);
 
-        recursively_copy_dir(&unzip_dir, &mod_path)?;
+        let name = package_name.to_string_lossy().into_owned();
+        let previous = ctx
+            .tracker
+            .get(&name)
+            .map(|record| record.file_path.clone());
+        self.commit_installation(&unzip_dir, &mod_path, previous.as_deref())?;
+
+        ctx.tracker.insert(InstalledPackageRecord {
+            name,
+            identifier: package_name.to_string_lossy().into_owned(),
+            version: None,
+            file_path: mod_path,
+        });
 
         Ok(())
     }
@@ -306,5 +388,26 @@ mod tests {
 
         assert!(!package_dir.exists());
         assert!(ctx.tracker.get("Author-Mod").is_none());
+    }
+
+    #[test]
+    fn transaction_replaces_destination_and_cleans_previous_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let source = temp_dir.path().join("source");
+        let destination = temp_dir.path().join("destination");
+        let previous = temp_dir.path().join("previous");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::create_dir_all(&previous).unwrap();
+        fs::write(source.join("new.txt"), "new").unwrap();
+        fs::write(destination.join("old.txt"), "old").unwrap();
+
+        PackageInstaller::new()
+            .commit_installation(&source, &destination, Some(&previous))
+            .unwrap();
+
+        assert!(!destination.join("old.txt").exists());
+        assert!(destination.join("new.txt").exists());
+        assert!(!previous.exists());
     }
 }

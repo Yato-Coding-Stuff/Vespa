@@ -1,4 +1,4 @@
-use std::{path::Path, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
     base::{
@@ -8,22 +8,29 @@ use crate::{
         runner::game_runner::GameRunner,
         util::config::{Config, GameSwitcher},
     },
-    hk::profile_manager::profile_manager::HkProfileManager,
+    hk::{
+        manager::package_layout::HkPackageLayout,
+        profile_initializer::profile_initializer::HkProfileInitializer,
+        runner::game_runner::HkGameRunner,
+    },
     sk::{
-        packages::package_scanner::SkPackageScanner,
-        profile_manager::profile_manager::SkProfileManager, runner::game_runner::SkGameRunner,
+        manager::{
+            bepinex_manager_extension::BEPINEX_PACKAGE_NAME, package_layout::SkPackageLayout,
+        },
+        profile_initializer::profile_initializer::SkProfileInitializer,
+        runner::game_runner::SkGameRunner,
     },
 };
 
-const SK_BLACKLIST: &[&str] = &["BepInEx-BepInExPack_Silksong"];
+const SK_BLACKLIST: &[&str] = &[BEPINEX_PACKAGE_NAME];
 
 const HK_BLACKLIST: &[&str] = &[];
 
 pub struct GameServices {
     pub package_loader: PackageLoader,
-    pub package_scanner: Box<dyn PackageScanner>,
+    pub package_scanner: Box<PackageScanner>,
     pub package_manager: Rc<PackageManager>,
-    pub profile_manager: Box<dyn ProfileManager>,
+    pub profile_manager: Box<ProfileManager>,
     pub game_runner: Box<dyn GameRunner>,
     pub blacklist: &'static [&'static str],
 }
@@ -32,38 +39,64 @@ impl GameServices {
     pub fn for_game(game: &GameSwitcher) -> Self {
         match game {
             GameSwitcher::SilkSong => {
-                let package_manager = Rc::new(PackageManager::new(
-                    SK_BLACKLIST,
-                    crate::sk::packages::package_layout::package_root,
+                let package_loader = crate::sk::packages::fetch_package_records;
+                let package_layout = Box::new(SkPackageLayout);
+                let blacklist = SK_BLACKLIST;
+
+                let package_manager =
+                    Rc::new(PackageManager::new(blacklist, package_layout.clone()));
+
+                let package_scanner = Box::new(PackageScanner::new(package_layout));
+
+                let profile_initializer = Box::new(SkProfileInitializer {
+                    package_manager: package_manager.clone(),
+                    package_loader,
+                    blacklist,
+                });
+
+                let profile_manager = Box::new(ProfileManager::new(
+                    Config::config_dir(),
+                    profile_initializer,
                 ));
 
                 Self {
-                    package_loader: crate::sk::packages::fetch_package_records,
-                    package_scanner: Box::new(SkPackageScanner),
-                    package_manager: package_manager.clone(),
-                    profile_manager: Box::new(SkProfileManager::new(
-                        Config::config_dir(),
-                        package_manager,
-                        crate::sk::packages::fetch_package_records,
-                        SK_BLACKLIST,
-                    )),
+                    package_loader,
+                    package_scanner,
+                    package_manager,
+                    profile_manager,
                     game_runner: Box::new(SkGameRunner),
-                    blacklist: SK_BLACKLIST,
+                    blacklist,
                 }
             }
 
             GameSwitcher::HollowKnight => {
-                // The package root and SK scanner remain temporary fallbacks until the
-                // HK-specific package layout and scanner are introduced.
-                let package_manager = Rc::new(PackageManager::new(HK_BLACKLIST, Path::to_path_buf));
+                let package_loader = crate::hk::packages::fetch_package_records;
+                let package_layout = Box::new(HkPackageLayout);
+                let blacklist = HK_BLACKLIST;
+
+                let package_manager =
+                    Rc::new(PackageManager::new(blacklist, package_layout.clone()));
+
+                let package_scanner = Box::new(PackageScanner::new(package_layout));
+
+                let profile_initializer = Box::new(HkProfileInitializer {
+                    package_manager: package_manager.clone(),
+                    package_loader,
+                    blacklist,
+                });
+
+                let profile_manager = Box::new(ProfileManager::new(
+                    Config::config_dir(),
+                    profile_initializer,
+                ));
 
                 Self {
-                    package_loader: crate::hk::packages::fetch_package_records,
-                    package_scanner: Box::new(SkPackageScanner),
+                    package_loader,
+                    package_scanner,
                     package_manager,
-                    profile_manager: Box::new(HkProfileManager::new(Config::config_dir())),
-                    game_runner: Box::new(SkGameRunner),
-                    blacklist: HK_BLACKLIST,
+                    profile_manager,
+                    game_runner: Box::new(HkGameRunner),
+                    blacklist,
                 }
             }
         }
