@@ -16,7 +16,7 @@ use thiserror::Error;
 pub enum UninstallResult {
     Uninstalled,
     NotInstalled,
-    PackageStillRequired,
+    PackageStillRequired { packages: Vec<String> },
 }
 
 #[derive(Debug, Error)]
@@ -39,8 +39,10 @@ pub fn run<F: FnMut(UninstallEvent)>(
     let deps = DependencyHandler::new(pm);
     let ctx = &mut app.context;
 
-    if ReverseDependencyHandler::package_is_required(ctx, &package.name) && !force {
-        return Ok(UninstallResult::PackageStillRequired);
+    if let packages = ReverseDependencyHandler::packages_requiring(ctx, &package.name)
+        && !force
+    {
+        return Ok(UninstallResult::PackageStillRequired { packages });
     }
 
     pm.uninstall_package(ctx, package, progress, profile_path)?;
@@ -50,17 +52,16 @@ pub fn run<F: FnMut(UninstallEvent)>(
         .get_package_by_identifier(&package.identifier)
         .map(|p| p.dependencies);
 
-    match dep {
-        Some(dep) => {
-            let still_required = deps
-                .uninstall_dependencies(ctx, dep, force, progress, profile_path)
-                .map_err(UninstallError::DependencyErrors)?;
+    if let Some(dep) = dep {
+        let still_required = deps
+            .uninstall_dependencies(ctx, dep, force, progress, profile_path)
+            .map_err(UninstallError::DependencyErrors)?;
 
-            if !still_required.is_empty() {
-                return Ok(UninstallResult::PackageStillRequired);
-            }
+        if !still_required.is_empty() {
+            return Ok(UninstallResult::PackageStillRequired {
+                packages: still_required,
+            });
         }
-        None => {}
     }
 
     Ok(UninstallResult::Uninstalled)

@@ -66,8 +66,12 @@ pub fn uninstall(
             Ok(UninstallResult::NotInstalled) => {
                 println!("==> {} is not installed", package.identifier);
             }
-            Ok(UninstallResult::PackageStillRequired) => {
-                println!("==> {} is required by another package", package.identifier);
+            Ok(UninstallResult::PackageStillRequired { packages }) => {
+                println!(
+                    "==> {} is required by the following packages: {:?}",
+                    package.identifier,
+                    packages.join(", ")
+                );
                 println!("==> Please re-run with --force if you want to uninstall anyway");
             }
             Err(e) => {

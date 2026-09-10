@@ -6,6 +6,7 @@ use thiserror::Error;
 use crate::base::{
     cli::presenter::events::{InstallEvent, UninstallEvent, UpdateEvent},
     manager::package_manager::PackageManager,
+    packages::PackageRecord,
     util::context::Context,
 };
 
@@ -303,19 +304,25 @@ impl<'pm> DependencyHandler<'pm> {
 pub struct ReverseDependencyHandler;
 
 impl ReverseDependencyHandler {
-    pub fn package_is_required(ctx: &Context, target: &str) -> bool {
-        ctx.tracker.get_all().values().any(|installed_pkg| {
-            match ctx
-                .index
-                .get_package_by_identifier(&installed_pkg.identifier)
-            {
-                Some(installed_info) => installed_info.dependencies.iter().any(|dep| {
+    pub fn packages_requiring(ctx: &Context, target: &str) -> Vec<String> {
+        ctx.tracker
+            .get_all()
+            .values()
+            .filter(|installed_pkg| {
+                let Some(installed_info) = ctx
+                    .index
+                    .get_package_by_identifier(&installed_pkg.identifier)
+                else {
+                    return false;
+                };
+
+                installed_info.dependencies.iter().any(|dep| {
                     let dep_name = dep.rsplitn(2, '-').nth(1).unwrap_or(dep);
                     dep_name == target
-                }),
-                None => false,
-            }
-        })
+                })
+            })
+            .map(|pkg| pkg.identifier.clone())
+            .collect()
     }
 
     pub fn dependency_is_required(ctx: &Context, target: &str) -> bool {
