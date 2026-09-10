@@ -150,6 +150,10 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(result, UninstallResult::PackageStillRequired));
+        assert!(matches!(
+            result,
+            UninstallResult::PackageStillRequired { packages }
+                if packages == vec!["Author-Mod-1.0.0"]
+        ));
     }
 }

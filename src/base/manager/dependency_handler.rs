@@ -391,7 +391,7 @@ mod tests {
     }
 
     #[test]
-    fn package_is_required_checks_dependency_by_package_name() {
+    fn packages_requiring_returns_dependents_by_package_name() {
         let tracked = vec![InstalledPackageRecord {
             identifier: "Author-ModA-1.0.0".to_string(),
             name: "Author-ModA".to_string(),
@@ -405,14 +405,11 @@ mod tests {
         )];
         let ctx = context_with_packages(tracked, indexed);
 
-        assert!(ReverseDependencyHandler::package_is_required(
-            &ctx,
-            "Author-Dependency"
-        ));
-        assert!(!ReverseDependencyHandler::package_is_required(
-            &ctx,
-            "SomethingElse"
-        ));
+        assert_eq!(
+            ReverseDependencyHandler::packages_requiring(&ctx, "Author-Dependency"),
+            vec!["Author-ModA-1.0.0"]
+        );
+        assert!(ReverseDependencyHandler::packages_requiring(&ctx, "SomethingElse").is_empty());
     }
 
     #[test]
