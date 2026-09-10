@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{path::Path, rc::Rc};
 
 use crate::{
     base::{
@@ -32,7 +32,10 @@ impl GameServices {
     pub fn for_game(game: &GameSwitcher) -> Self {
         match game {
             GameSwitcher::SilkSong => {
-                let package_manager = Rc::new(PackageManager::new(SK_BLACKLIST));
+                let package_manager = Rc::new(PackageManager::new(
+                    SK_BLACKLIST,
+                    crate::sk::packages::package_layout::package_root,
+                ));
 
                 Self {
                     package_loader: crate::sk::packages::fetch_package_records,
@@ -50,9 +53,9 @@ impl GameServices {
             }
 
             GameSwitcher::HollowKnight => {
-                // The SK package implementation remains the temporary package-operation
-                // fallback until its HK equivalent is introduced.
-                let package_manager = Rc::new(PackageManager::new(HK_BLACKLIST));
+                // The package root and SK scanner remain temporary fallbacks until the
+                // HK-specific package layout and scanner are introduced.
+                let package_manager = Rc::new(PackageManager::new(HK_BLACKLIST, Path::to_path_buf));
 
                 Self {
                     package_loader: crate::hk::packages::fetch_package_records,

@@ -200,7 +200,10 @@ impl SkProfileManager {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, rc::Rc};
+    use std::{
+        path::{Path, PathBuf},
+        rc::Rc,
+    };
 
     use tempfile::tempdir;
 
@@ -226,7 +229,7 @@ mod tests {
     fn manager(base_dir: PathBuf) -> SkProfileManager {
         SkProfileManager::new(
             base_dir,
-            Rc::new(PackageManager::new(TEST_BLACKLIST)),
+            Rc::new(PackageManager::new(TEST_BLACKLIST, Path::to_path_buf)),
             empty_package_loader,
             TEST_BLACKLIST,
         )

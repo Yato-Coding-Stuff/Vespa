@@ -2,13 +2,15 @@ use std::{collections::HashMap, fs, path::Path};
 
 use crate::base::packages::{package::InstalledPackageRecord, package_scanner::PackageScanner};
 
+use super::package_layout::package_root;
+
 #[derive(Debug, Default)]
 pub struct SkPackageScanner;
 
 impl PackageScanner for SkPackageScanner {
     fn scan_plugins(&self, profile_path: &Path) -> HashMap<String, InstalledPackageRecord> {
         let mut packages = HashMap::new();
-        let plugins_path = profile_path.join("BepInEx").join("plugins");
+        let plugins_path = package_root(profile_path);
 
         if let Ok(entries) = fs::read_dir(plugins_path) {
             for entry in entries.flatten() {
@@ -37,13 +39,15 @@ impl PackageScanner for SkPackageScanner {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{fs, io::Write};
 
     use tempfile::tempdir;
+    use zip::{ZipWriter, write::SimpleFileOptions};
 
-    use super::SkPackageScanner;
+    use super::{SkPackageScanner, package_root};
     use crate::base::{
-        packages::package_scanner::PackageScanner, tracker::package_tracker::PackageTracker,
+        manager::package_manager::PackageManager, packages::package_scanner::PackageScanner,
+        tracker::package_tracker::PackageTracker,
     };
 
     #[test]
@@ -62,5 +66,35 @@ mod tests {
         assert_eq!(versioned.version.as_deref(), Some("1.2.3"));
         assert_eq!(unversioned.version, None);
         assert_eq!(tracker.get_all().len(), 2);
+    }
+
+    #[test]
+    fn local_install_is_discovered_after_rebuilding_tracker() {
+        let temp_dir = tempdir().unwrap();
+        let archive_path = temp_dir.path().join("Author-Mod-1.2.3.zip");
+        let archive_file = fs::File::create(&archive_path).unwrap();
+        let mut archive = ZipWriter::new(archive_file);
+        archive
+            .start_file("mod.dll", SimpleFileOptions::default())
+            .unwrap();
+        archive.write_all(b"binary").unwrap();
+        archive.finish().unwrap();
+
+        let profile_path = temp_dir.path().join("profile");
+        let manager = PackageManager::new(&[], package_root);
+        manager
+            .install_local_package(&archive_path, &profile_path)
+            .unwrap();
+
+        let mut tracker = PackageTracker::new();
+        tracker.replace(SkPackageScanner.scan_plugins(&profile_path));
+
+        let installed = tracker.get("Author-Mod").unwrap();
+        assert_eq!(installed.identifier, "Author-Mod-1.2.3");
+        assert_eq!(installed.version.as_deref(), Some("1.2.3"));
+        assert_eq!(
+            installed.file_path,
+            package_root(&profile_path).join("Author-Mod-1.2.3")
+        );
     }
 }

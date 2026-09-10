@@ -79,6 +79,9 @@ pub enum SubArgs {
         all_versions: bool,
     },
     Show {
+        // TODO:
+        // show available mods instead of insatlled ones
+        //
         #[arg(required = true)]
         package: String,
     },
@@ -105,6 +108,7 @@ pub enum ProfileArgs {
         #[arg(required = true)]
         profile: String,
     },
+    // rename...
 }
 
 #[cfg(test)]

@@ -1,4 +1,3 @@
-use crate::base::manager::package_installer::PackageInstaller;
 use dialoguer::Confirm;
 use std::path::PathBuf;
 
@@ -31,8 +30,11 @@ pub fn install(app: &mut App, package_paths: Vec<PathBuf>, profile_path: &PathBu
     }
 
     for package in package_paths {
-        let package_installer = PackageInstaller::new();
-        match package_installer.install_local_package(&package, profile_path) {
+        match app
+            .game_services
+            .package_manager
+            .install_local_package(&package, profile_path)
+        {
             Ok(()) => {
                 println!("==> Installed {}", package.to_string_lossy());
             }
