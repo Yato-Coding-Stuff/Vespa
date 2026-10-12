@@ -2,7 +2,8 @@ use quick_xml::de::from_str;
 use thiserror::Error;
 
 use crate::{
-    base::util::platform::OperatingSystem, hk::packages::package::{ApiLinksDto, HkDependenciesDto, HkPackageDto, ModLinksDto}
+    base::util::platform::OperatingSystem,
+    hk::packages::package::{ApiLinksDto, HkDependenciesDto, HkPackageDto, ModLinksDto},
 };
 
 #[derive(Debug, Error)]

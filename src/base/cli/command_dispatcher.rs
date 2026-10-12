@@ -69,7 +69,7 @@ pub fn run(app: &mut App, args: Arg) {
                 profile_command::list(app);
             }
             ProfileArgs::Create { profile } => {
-                profile_command::create(app, &mut presenter,profile);
+                profile_command::create(app, &mut presenter, profile);
             }
             ProfileArgs::Delete { profile } => {
                 profile_command::delete(app, &mut presenter, profile);

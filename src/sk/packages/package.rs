@@ -50,8 +50,7 @@ pub(super) fn flatten_packages(
                     .dependencies
                     .into_iter()
                     .filter(|dependency| {
-                        let (dependency_name, _) =
-                            split_package_name_with_version(dependency);
+                        let (dependency_name, _) = split_package_name_with_version(dependency);
                         !blacklist.contains(dependency_name)
                     })
                     .collect();
@@ -71,9 +70,7 @@ pub(super) fn flatten_packages(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        SkPackageDto, VersionDto, flatten_packages, split_package_name_with_version,
-    };
+    use super::{SkPackageDto, VersionDto, flatten_packages, split_package_name_with_version};
     use crate::base::packages::Index;
 
     fn package(

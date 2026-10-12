@@ -46,10 +46,7 @@ impl Index {
             .cloned()
     }
 
-    pub fn get_latest_package_by_package_name(
-        &self,
-        package_name: &str,
-    ) -> Option<PackageRecord> {
+    pub fn get_latest_package_by_package_name(&self, package_name: &str) -> Option<PackageRecord> {
         self.packages_by_name
             .get(package_name)
             .and_then(|versions| versions.first())

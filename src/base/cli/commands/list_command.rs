@@ -62,11 +62,9 @@ pub fn list_installed(ctx: &mut Context, query: Vec<String>) {
         .values()
         .filter(|p| {
             query.is_empty()
-                || query.iter().any(|q| {
-                    p.name
-                        .to_lowercase()
-                        .contains(&q.to_lowercase())
-                })
+                || query
+                    .iter()
+                    .any(|q| p.name.to_lowercase().contains(&q.to_lowercase()))
         })
         .collect();
 

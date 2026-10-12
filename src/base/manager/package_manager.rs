@@ -120,8 +120,6 @@ impl PackageManager {
         progress: &mut dyn FnMut(UpdateEvent),
         profile_path: &PathBuf,
     ) -> Result<(), PackageManagerError> {
-
-
         if self.blacklist.contains(&package.name.as_str()) {
             return Err(PackageManagerError::PackageBlacklisted(
                 package.identifier.clone(),

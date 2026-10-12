@@ -21,10 +21,7 @@ pub fn get_input_in_index(
             .get_package_by_identifier(&package)
             .or_else(|| ctx.index.get_latest_package_by_package_name(&package))
         {
-            println!(
-                "==> Exact match found: {}",
-                package.identifier
-            );
+            println!("==> Exact match found: {}", package.identifier);
             optional_packages.push(Some(package));
         } else {
             let matcher = SkimMatcherV2::default();
@@ -106,10 +103,7 @@ pub fn get_input_in_tracker(
     let mut optional_packages: Vec<Option<InstalledPackageRecord>> = Vec::new();
     for package in packages {
         if let Some(package) = ctx.tracker.get(&package) {
-            println!(
-                "==> Exact match found: {}",
-                package.identifier
-            );
+            println!("==> Exact match found: {}", package.identifier);
             optional_packages.push(Some(package.clone()));
         } else {
             let matcher = SkimMatcherV2::default();

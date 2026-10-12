@@ -10,7 +10,7 @@ use crate::base::{
     profile_manager::profile_manager::{ProfileInitializer, ProfileManagerError},
     util::context::Context,
 };
-use crate::hk::manager::api_manager_extension::{HkApiPackageManagerExt, HK_API_PACKAGE_NAME};
+use crate::hk::manager::api_manager_extension::{HK_API_PACKAGE_NAME, HkApiPackageManagerExt};
 
 pub struct HkProfileInitializer {
     pub package_manager: Rc<PackageManager>,

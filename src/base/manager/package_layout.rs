@@ -2,9 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     base::{
-        cli::presenter::
-            presenter::Presenter
-        ,
+        cli::presenter::presenter::Presenter,
         manager::package_manager::{PackageManager, PackageManagerError},
         util::context::Context,
     },

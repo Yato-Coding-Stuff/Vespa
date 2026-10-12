@@ -5,17 +5,15 @@ use std::{
 
 use thiserror::Error;
 
-use crate::
-    base::{
-        cli::presenter::{events::ProfileManagerEvent, presenter::Presenter},
-        manager::package_manager::PackageManagerError,
-        packages::IndexError,
-        util::{
-            config::{ConfigError, GameSwitcher},
-            context::Context,
-        },
-    }
-;
+use crate::base::{
+    cli::presenter::{events::ProfileManagerEvent, presenter::Presenter},
+    manager::package_manager::PackageManagerError,
+    packages::IndexError,
+    util::{
+        config::{ConfigError, GameSwitcher},
+        context::Context,
+    },
+};
 
 pub trait ProfileInitializer {
     fn initialize(

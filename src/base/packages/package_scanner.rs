@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    path::Path,
-};
+use std::{collections::HashMap, fs, path::Path};
 
 use crate::base::{
     manager::package_layout::PackageLayout, packages::package::InstalledPackageRecord,
