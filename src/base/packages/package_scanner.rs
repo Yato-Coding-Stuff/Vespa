@@ -1,23 +1,25 @@
 use std::{
     collections::HashMap,
     fs,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
-use crate::base::packages::package::InstalledPackageRecord;
+use crate::base::{
+    manager::package_layout::PackageLayout, packages::package::InstalledPackageRecord,
+};
 
 pub struct PackageScanner {
-    package_root: fn(&Path) -> PathBuf,
+    package_layout: Box<dyn PackageLayout>,
 }
 
 impl PackageScanner {
-    pub fn new(package_root: fn(&Path) -> PathBuf) -> Self {
-        Self { package_root }
+    pub fn new(package_layout: Box<dyn PackageLayout>) -> Self {
+        Self { package_layout }
     }
 
     pub fn scan_plugins(&self, profile_path: &Path) -> HashMap<String, InstalledPackageRecord> {
         let mut packages = HashMap::new();
-        let plugins_path = (self.package_root)(profile_path);
+        let plugins_path = self.package_layout.package_root(profile_path);
 
         if let Ok(entries) = fs::read_dir(plugins_path) {
             for entry in entries.flatten() {

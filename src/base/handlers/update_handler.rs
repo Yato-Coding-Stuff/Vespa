@@ -34,33 +34,24 @@ pub fn run(
     bulk_update: bool,
     profile_path: &PathBuf,
 ) -> Result<UpdateResult, UpdateError> {
-    let update_progress = &mut |event: UpdateEvent| {
-        progress.display(&event);
-    };
-
-    let pm = app.game_services.package_manager.as_ref();
-    let dependency_manager = DependencyHandler::new(pm);
-    let ctx = &mut app.context;
-
     let requested_version = package.version.parse::<Version>().unwrap();
 
-    match ctx.tracker.get(&package.name) {
+    match app.context.tracker.get(&package.name) {
         None => {
             return Ok(UpdateResult::NotInstalled);
         }
         Some(installed) => {
             let installed_version = installed
                 .version
-                .as_deref() // Option<&str>
-                .unwrap_or("0.0.0") // default if missing
-                .parse::<Version>() // parse to Version
-                .unwrap_or_else(|_| Version::new(0, 0, 0)); // fallback if parse fails
+                .as_deref()
+                .unwrap_or("0.0.0")
+                .parse::<Version>()
+                .unwrap_or_else(|_| Version::new(0, 0, 0));
 
-            // Compare versions
             if installed_version == requested_version {
                 return Ok(UpdateResult::AlreadyNewestVersion);
             } else if installed_version < requested_version {
-                update_progress(UpdateEvent::UpdateMod {
+                progress.display(&UpdateEvent::UpdateMod {
                     name: package.name.clone(),
                     old_version: installed_version.to_string(),
                     new_version: package.version.clone(),
@@ -69,8 +60,16 @@ pub fn run(
         }
     }
 
-    pm.update_package(ctx, package, update_progress, profile_path)?;
+    update_package_with_game_layout(app, package, progress, profile_path)?;
+
     if !bulk_update {
+        let pm = app.game_services.package_manager.as_ref();
+        let dependency_manager = DependencyHandler::new(pm);
+        let ctx = &mut app.context;
+        let update_progress = &mut |event: UpdateEvent| {
+            progress.display(&event);
+        };
+
         dependency_manager
             .update_dependencies(
                 ctx,
@@ -82,6 +81,30 @@ pub fn run(
     }
 
     Ok(UpdateResult::Updated)
+}
+
+fn update_package_with_game_layout(
+    app: &mut App,
+    package: &PackageRecord,
+    progress: &mut Presenter,
+    profile_path: &PathBuf,
+) -> Result<(), PackageManagerError> {
+    let pm = app.game_services.package_manager.as_ref();
+
+    if pm.package_layout.install_special_package(
+        pm,
+        &mut app.context,
+        package,
+        progress,
+        profile_path,
+    )? {
+        return Ok(());
+    }
+
+    let update_progress = &mut |event: UpdateEvent| {
+        progress.display(&event);
+    };
+    pm.update_package(&mut app.context, package, update_progress, profile_path)
 }
 
 #[cfg(test)]

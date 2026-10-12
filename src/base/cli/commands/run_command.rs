@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     app::application::App,
-    base::runner::game_runner::{LaunchRequest, OperatingSystem},
+    base::{runner::game_runner::LaunchRequest, util::platform::OperatingSystem},
 };
 
 pub fn run(app: &App, profile_path: &Path) {

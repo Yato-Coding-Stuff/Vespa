@@ -21,7 +21,6 @@ pub trait ProfileInitializer {
     fn initialize(
         &self,
         ctx: &mut Context,
-        game: &GameSwitcher,
         presenter: &mut Presenter,
         profile_dir: &Path,
         profile: &str,
@@ -80,7 +79,7 @@ impl ProfileManager {
         }
 
         self.initializer
-            .initialize(ctx, game, presenter, &profile_dir, profile)?;
+            .initialize(ctx, presenter, &profile_dir, profile)?;
 
         self.set_profile_as_default(ctx, game, presenter, profile)?;
 

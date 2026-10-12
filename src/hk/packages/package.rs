@@ -1,6 +1,6 @@
 use semver::Version;
-use serde::Deserialize;
 use serde::de::Error;
+use serde::Deserialize;
 
 use crate::base::packages::PackageRecord;
 
@@ -65,6 +65,39 @@ pub(super) struct HkDependenciesDto {
 pub(super) struct ModLinksDto {
     #[serde(rename = "Manifest")]
     pub packages: Vec<HkPackageDto>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ApiLinksDto {
+    #[serde(rename = "Manifest")]
+    pub manifest: ApiManifestDto,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ApiManifestDto {
+    #[serde(rename = "Version")]
+    pub version: String,
+
+    #[serde(rename = "Links")]
+    pub links: ApiPlatformLinksDto,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ApiPlatformLinksDto {
+    #[serde(rename = "Linux")]
+    pub linux: ApiPlatformLinkDto,
+
+    #[serde(rename = "Mac")]
+    pub mac: ApiPlatformLinkDto,
+
+    #[serde(rename = "Windows")]
+    pub windows: ApiPlatformLinkDto,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ApiPlatformLinkDto {
+    #[serde(rename = "$text", deserialize_with = "deserialize_trimmed")]
+    pub url: String,
 }
 
 impl From<HkPackageDto> for PackageRecord {

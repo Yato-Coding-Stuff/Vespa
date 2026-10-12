@@ -4,8 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::base::runner::game_runner::{
-    GameRunner, GameRunnerError, LaunchPlan, LaunchRequest, OperatingSystem,
+use crate::base::{
+    runner::game_runner::{GameRunner, GameRunnerError, LaunchPlan, LaunchRequest},
+    util::platform::OperatingSystem,
 };
 
 pub struct SkGameRunner;
@@ -17,6 +18,7 @@ impl GameRunner for SkGameRunner {
         match request.os {
             OperatingSystem::Linux => build_linux_launch_plan(request),
             OperatingSystem::Windows => build_windows_launch_plan(request),
+            OperatingSystem::MacOS => Err(GameRunnerError::UnsupportedOperatingSystem),
             OperatingSystem::Unsupported => Err(GameRunnerError::UnsupportedOperatingSystem),
         }
     }
@@ -123,6 +125,7 @@ fn game_executable_candidates(os: OperatingSystem) -> &'static [&'static str] {
     match os {
         OperatingSystem::Linux => &["silksong", "Silksong"],
         OperatingSystem::Windows => &["silksong.exe", "Silksong.exe"],
+        OperatingSystem::MacOS => &[],
         OperatingSystem::Unsupported => &[],
     }
 }
@@ -141,7 +144,10 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{SkGameRunner, doorstop_target_assembly};
-    use crate::base::runner::game_runner::{GameRunner, LaunchRequest, OperatingSystem};
+    use crate::base::{
+        runner::game_runner::{GameRunner, LaunchRequest},
+        util::platform::OperatingSystem,
+    };
 
     #[test]
     fn linux_plan_includes_doorstop_arguments() {

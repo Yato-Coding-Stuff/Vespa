@@ -4,16 +4,13 @@ use std::rc::Rc;
 use crate::base::cli::presenter::events::ProfileManagerEvent;
 use crate::base::manager::package_manager::PackageManager;
 use crate::base::packages::PackageLoader;
-use crate::base::util::config::GameSwitcher;
 use crate::base::util::context::Context;
 use crate::sk::manager::bepinex_manager_extension::BepInExPackageManagerExt;
 
-use crate::
-    base::{
-        cli::presenter::{events::InstallEvent, presenter::Presenter},
-        profile_manager::profile_manager::{ProfileInitializer, ProfileManagerError},
-    }
-;
+use crate::base::{
+    cli::presenter::{events::InstallEvent, presenter::Presenter},
+    profile_manager::profile_manager::{ProfileInitializer, ProfileManagerError},
+};
 
 pub struct SkProfileInitializer {
     pub package_manager: Rc<PackageManager>,
@@ -25,7 +22,6 @@ impl ProfileInitializer for SkProfileInitializer {
     fn initialize(
         &self,
         ctx: &mut Context,
-        game: &GameSwitcher,
         presenter: &mut Presenter,
         profile_dir: &Path,
         profile: &str,
@@ -38,10 +34,9 @@ impl ProfileInitializer for SkProfileInitializer {
         if !bepinex_dir.exists() {
             profile_progress(ProfileManagerEvent::InstallingBepInEx {
                 name: profile.to_string(),
-                game: game.to_string(),
                 path: bepinex_dir.to_string_lossy().to_string(),
             });
-            self.install_bepinex(ctx, presenter, &profile_dir)?;
+            self.install_bepinex(ctx, presenter, profile_dir)?;
         }
         Ok(())
     }

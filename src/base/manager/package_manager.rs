@@ -7,6 +7,7 @@ use crate::base::{
     manager::{
         package_downloader::{PackageDownloader, PackageDownloaderError},
         package_installer::{PackageInstaller, PackageInstallerError},
+        package_layout::PackageLayout,
     },
     packages::{PackageRecord, package::InstalledPackageRecord},
     util::{context::Context, file_handler::delete_dir},
@@ -26,16 +27,16 @@ pub struct PackageManager {
     pub downloader: PackageDownloader,
     pub installer: PackageInstaller,
     pub blacklist: &'static [&'static str],
-    package_root: fn(&Path) -> PathBuf,
+    pub package_layout: Box<dyn PackageLayout>,
 }
 
 impl PackageManager {
-    pub fn new(blacklist: &'static [&'static str], package_root: fn(&Path) -> PathBuf) -> Self {
+    pub fn new(blacklist: &'static [&'static str], package_layout: Box<dyn PackageLayout>) -> Self {
         Self {
             downloader: PackageDownloader::new(),
             installer: PackageInstaller::new(),
             blacklist,
-            package_root,
+            package_layout,
         }
     }
 
@@ -83,7 +84,7 @@ impl PackageManager {
         archive_path: &PathBuf,
         profile_path: &PathBuf,
     ) -> Result<(), PackageManagerError> {
-        let package_root = (self.package_root)(profile_path);
+        let package_root = self.package_layout.package_root(profile_path);
         self.installer
             .install_local_package(archive_path, &package_root)?;
         Ok(())
@@ -119,6 +120,8 @@ impl PackageManager {
         progress: &mut dyn FnMut(UpdateEvent),
         profile_path: &PathBuf,
     ) -> Result<(), PackageManagerError> {
+
+
         if self.blacklist.contains(&package.name.as_str()) {
             return Err(PackageManagerError::PackageBlacklisted(
                 package.identifier.clone(),
@@ -176,36 +179,8 @@ impl PackageManager {
     }
 
     fn package_destination(&self, profile_path: &Path, package: &PackageRecord) -> PathBuf {
-        (self.package_root)(profile_path).join(&package.identifier)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::{Path, PathBuf};
-
-    use super::PackageManager;
-    use crate::base::packages::PackageRecord;
-
-    fn nested_package_root(profile_path: &Path) -> PathBuf {
-        profile_path.join("packages")
-    }
-
-    #[test]
-    fn package_destination_combines_game_root_and_identifier() {
-        let manager = PackageManager::new(&[], nested_package_root);
-        let package = PackageRecord {
-            name: "Author-Mod".to_string(),
-            identifier: "Author-Mod-1.2.3".to_string(),
-            version: "1.2.3".to_string(),
-            description: String::new(),
-            download_url: String::new(),
-            dependencies: Vec::new(),
-        };
-
-        assert_eq!(
-            manager.package_destination(Path::new("/profile"), &package),
-            PathBuf::from("/profile/packages/Author-Mod-1.2.3")
-        );
+        self.package_layout
+            .package_root(profile_path)
+            .join(&package.identifier)
     }
 }

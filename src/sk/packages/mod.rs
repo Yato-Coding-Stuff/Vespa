@@ -1,6 +1,5 @@
 mod package;
 pub mod package_fetcher;
-pub(crate) mod package_layout;
 
 pub use crate::base::packages::{IndexError, PackageRecord};
 
