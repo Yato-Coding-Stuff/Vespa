@@ -6,7 +6,6 @@ use thiserror::Error;
 use crate::base::{
     cli::presenter::events::{InstallEvent, UninstallEvent, UpdateEvent},
     manager::package_manager::PackageManager,
-    packages::PackageRecord,
     util::context::Context,
 };
 

@@ -1,9 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use tempfile::TempDir;
 
 use crate::base::{
-    cli::presenter::{events::InstallEvent, presenter::Presenter},
+    cli::presenter::events::InstallEvent,
     manager::{
         package_installer::PackageInstallerError,
         package_manager::{PackageManager, PackageManagerError},
