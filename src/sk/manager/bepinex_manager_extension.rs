@@ -17,24 +17,6 @@ use crate::base::{
 
 pub(crate) const BEPINEX_PACKAGE_NAME: &str = "BepInEx-BepInExPack_Silksong";
 
-pub(crate) fn update_bepinex_package_layout(
-    package_manager: &PackageManager,
-    ctx: &mut Context,
-    package: &PackageRecord,
-    presenter: &mut Presenter,
-    profile_path: &PathBuf,
-) -> Result<bool, PackageManagerError> {
-    if package.name != BEPINEX_PACKAGE_NAME {
-        return Ok(false);
-    }
-
-    let progress = &mut |event: InstallEvent| {
-        presenter.display(&event);
-    };
-    package_manager.install_bepinex(ctx, package, progress, profile_path)?;
-    Ok(true)
-}
-
 pub(crate) trait BepInExPackageManagerExt {
     fn install_bepinex(
         &self,

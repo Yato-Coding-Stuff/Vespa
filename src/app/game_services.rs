@@ -1,27 +1,20 @@
-use std::{path::PathBuf, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
     base::{
-        cli::presenter::presenter::Presenter,
-        manager::package_manager::{PackageManager, PackageManagerError},
-        packages::{PackageLoader, PackageRecord, package_scanner::PackageScanner},
+        manager::package_manager::PackageManager,
+        packages::{PackageLoader, package_scanner::PackageScanner},
         profile_manager::profile_manager::ProfileManager,
         runner::game_runner::GameRunner,
-        util::{
-            config::{Config, GameSwitcher},
-            context::Context,
-        },
+        util::config::{Config, GameSwitcher},
     },
     hk::{
-        manager::{
-            api_manager_extension::update_hk_api_package_layout, package_layout::HkPackageLayout,
-        },
+        manager::package_layout::HkPackageLayout,
         profile_initializer::profile_initializer::HkProfileInitializer,
     },
     sk::{
         manager::{
-            bepinex_manager_extension::{BEPINEX_PACKAGE_NAME, update_bepinex_package_layout},
-            package_layout::SkPackageLayout,
+            bepinex_manager_extension::BEPINEX_PACKAGE_NAME, package_layout::SkPackageLayout,
         },
         profile_initializer::profile_initializer::SkProfileInitializer,
         runner::game_runner::SkGameRunner,

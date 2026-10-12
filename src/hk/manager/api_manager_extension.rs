@@ -1,9 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use tempfile::TempDir;
 
 use crate::base::{
-    cli::presenter::{events::InstallEvent, presenter::Presenter},
+    cli::presenter::events::InstallEvent,
     manager::{
         package_installer::PackageInstallerError,
         package_manager::{PackageManager, PackageManagerError},
@@ -16,24 +16,6 @@ use crate::base::{
 };
 
 pub(crate) const HK_API_PACKAGE_NAME: &str = "HollowKnight.ModdingApi";
-
-pub(crate) fn update_hk_api_package_layout(
-    package_manager: &PackageManager,
-    ctx: &mut Context,
-    package: &PackageRecord,
-    presenter: &mut Presenter,
-    profile_path: &PathBuf,
-) -> Result<bool, PackageManagerError> {
-    if package.name != HK_API_PACKAGE_NAME {
-        return Ok(false);
-    }
-
-    let progress = &mut |event: InstallEvent| {
-        presenter.display(&event);
-    };
-    package_manager.install_hk_api(ctx, package, progress, profile_path)?;
-    Ok(true)
-}
 
 pub(crate) trait HkApiPackageManagerExt {
     fn install_hk_api(
