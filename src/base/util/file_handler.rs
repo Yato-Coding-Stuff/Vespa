@@ -41,7 +41,12 @@ pub fn unzip_to_dir(zip_path: &Path, dest_dir: &Path) -> Result<(), FileHandlerE
         let mut file = archive
             .by_index(i)
             .map_err(FileHandlerError::ReadZipEntryError)?;
-        let outpath = dest_dir.join(file.name());
+
+        let Some(enclosed_name) = file.enclosed_name() else {
+            continue; // Skip paths that escape the destination directory
+        };
+
+        let outpath = dest_dir.join(enclosed_name);
 
         if file.is_dir() {
             fs::create_dir_all(&outpath).map_err(FileHandlerError::CreateZipDirError)?;
